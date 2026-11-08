@@ -1,73 +1,77 @@
 # Chợ Phiên 2D
 
-Game 2D chạy trên trình duyệt: người chơi điều khiển nhân vật đi dạo giữa 8 gian hàng của một khu chợ quê, xem sản phẩm, nhắn tin và gặp người chơi khác.
+A 2D browser game: you control a character strolling between the 8 stalls of a Vietnamese country market, browse products, chat, and meet other players.
 
-**Chơi thử:** https://cho-phien-2d.netlify.app
+**Play it:** https://cho-phien-2d.netlify.app
 
-## Tính năng
+> The in-game text (stall names, shopkeeper lines, buttons) is in Vietnamese, because the players are Vietnamese. Code comments and documentation are in English.
 
-- **Chợ có 8 gian hàng** (Áo Quần, Giày Dép, Phụ Kiện, Mỹ Phẩm, Đồ Ăn, Nước Uống, Trái Cây, Bánh Kẹo), mỗi gian một kiểu mái, tường và đồ trưng bày riêng; chủ tiệm chào khách và rao hàng.
-- **Popup sản phẩm** gồm danh sách món và trang chi tiết (mô tả, tùy chọn, nút mua Shopee/TikTok để gắn link sau).
-- **Tạo nhân vật:** tên, màu tên, trạng thái, thú cưng, màu da, tóc, áo, quần, mũ.
-- **Ngày và đêm theo giờ Việt Nam**, chợ đêm có ánh sáng, khuya một số gian đóng cửa.
-- **4 theme:** Tết, Trung thu, Noel, Mùa mưa (chỉ đổi khi người chơi chọn).
-- **Âm thanh** tổng hợp bằng Web Audio: hiệu ứng, tiếng môi trường, nhạc nền theo theme.
-- **Điều khiển** bằng bàn phím (WASD, mũi tên), chạm/click vào bản đồ, hoặc joystick ảo trên điện thoại.
-- **Nhiều người chơi** thấy nhau di chuyển và nhắn tin.
+## Features
 
-## Chạy trên máy
+- **8 stalls** (Áo Quần = clothes, Giày Dép = shoes, Phụ Kiện = accessories, Mỹ Phẩm = cosmetics, Đồ Ăn = food, Nước Uống = drinks, Trái Cây = fruit, Bánh Kẹo = sweets). Each has its own roof, walls and display, and a shopkeeper who greets customers and calls out goods.
+- **Product popup** with a product list and a detail page (description, options, Shopee/TikTok buy buttons to be wired up later).
+- **Character creator:** name, name colour, status, pet, skin, hair, shirt, pants, hat.
+- **Day and night on Vietnam time.** The night market is lit up, and some stalls close late at night.
+- **4 themes:** Tet, Mid-Autumn, Christmas, Rainy season (changed only when the player picks one).
+- **Sound** synthesized with Web Audio: effects, ambience and background music per theme.
+- **Controls:** keyboard (WASD, arrow keys), tap/click on the map, or a virtual joystick on phones.
+- **Multiplayer:** players see each other move and can chat.
 
-Game là một file duy nhất, không cần cài gì:
+## Run locally
+
+The game is a single file and needs no build step:
 
 ```bash
-# mở trực tiếp
+# open it directly
 xdg-open index.html
 
-# hoặc chạy bằng server tĩnh bất kỳ
+# or serve it with any static server
 python3 -m http.server 8080
 ```
 
-## Điều khiển
+## Controls
 
-| Việc | Máy tính | Điện thoại |
+| Action | Desktop | Phone |
 |---|---|---|
-| Di chuyển | WASD / phím mũi tên / click bản đồ | Joystick hoặc chạm bản đồ |
-| Vào gian | `E` hoặc click vào gian | Nút vàng "Vào gian" |
-| Nhân vật | `C` | Nút "Nhân vật" |
-| Cảnh chợ (ngày đêm, theme, âm thanh) | `T` | Nút giờ ở góc phải |
-| Nhắn tin | `Enter` | Nút 💬 |
+| Move | WASD / arrow keys / click the map | Joystick or tap the map |
+| Enter a stall | `E` or click the stall | Yellow "Vào gian" (enter stall) button |
+| Character | `C` | "Nhân vật" (character) button |
+| Scene (day/night, theme, sound) | `T` | The clock button at the top right |
+| Chat | `Enter` | The 💬 button |
 
-## Nhiều người chơi
+## Multiplayer
 
-Game dùng một **broker MQTT công cộng** làm bộ chuyển tiếp, nên không cần server riêng. Mở link kèm `?room=ten-nhom` để chơi riêng với một nhóm:
+The game uses a **public MQTT broker** as a relay, so no server of our own is needed. Open the link with `?room=group-name` to play privately with a group:
 
 ```
 https://cho-phien-2d.netlify.app/?room=team-a
 ```
 
-> Broker công cộng không có cam kết về độ ổn định và **không riêng tư**: ai biết tên chủ đề đều đọc và đăng được. Chỉ phù hợp để thử nghiệm. Khi chạy thật nên chuyển sang server WebSocket riêng (phần mạng nằm trong khối `Nhiều người chơi` của `index.html`).
+Anyone who opens the same room name sees each other. Without `?room=`, everyone joins the default room `main`.
+
+> A public broker comes with no uptime guarantee and is **not private**: anyone who knows the topic name can read and publish to it, so player names, positions and chat messages are exposed. It is fine for testing. For a real launch, move to our own WebSocket server (the networking code lives in the `Multiplayer` section of `index.html`).
 
 ## Deploy
 
-Site chạy trên Netlify (`cho-phien-2d`). Với Netlify CLI đã đăng nhập:
+The site is hosted on Netlify (`cho-phien-2d`). With the Netlify CLI logged in:
 
 ```bash
-./deploy.sh "ghi chú cho lần deploy"
+./deploy.sh "note for this deploy"
 ```
 
-Script chép `index.html` vào `dist/` rồi đẩy lên production.
+The script copies `index.html` into `dist/` and pushes it to production. Pushing to GitHub does not deploy by itself.
 
-## Cấu trúc
+## Project layout
 
 ```
-index.html     toàn bộ game (HTML, CSS, JS, asset nhúng base64)
-deploy.sh      deploy lên Netlify
-assets/        asset gốc của Kenney (đã giải nén, dùng làm nguồn)
+index.html     the whole game (HTML, CSS, JS, assets embedded as base64)
+deploy.sh      deploy to Netlify
+assets/        original Kenney assets (unpacked, kept as the source)
 ```
 
-Dữ liệu sản phẩm nằm ở mảng `PRODUCTS` trong `index.html`. Mỗi món có sẵn trường `img` (link ảnh) và `links.shopee`, `links.tiktok` để điền sau.
+Product data lives in the `PRODUCTS` array in `index.html`. Each product already has an `img` field (image URL) and `links.shopee` / `links.tiktok` fields to fill in later.
 
-## Ghi công
+## Credits
 
-Hình ảnh nhân vật và nền chợ dùng bộ asset miễn phí của [Kenney](https://kenney.nl) theo giấy phép CC0:
-[Tiny Town](https://kenney.nl/assets/tiny-town) và [Roguelike Characters](https://kenney.nl/assets/roguelike-characters).
+Character and market art uses free assets by [Kenney](https://kenney.nl) under the CC0 license:
+[Tiny Town](https://kenney.nl/assets/tiny-town) and [Roguelike Characters](https://kenney.nl/assets/roguelike-characters).

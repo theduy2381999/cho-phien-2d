@@ -65,7 +65,7 @@
   body[data-theme="noel"] #modal .box { box-shadow: 0 0 0 4px #2e7d32, 0 0 0 7px #fff, 0 10px 30px rgba(0,0,0,.4); }
   body[data-theme="mua"] #modal .box { box-shadow: 0 0 0 4px #546e7a, 0 0 0 7px #b0bec5, 0 10px 30px rgba(0,0,0,.4); }
   body.night #modal .box { filter: brightness(.92) saturate(.95); }
-  /* ----- Bảng nhân vật ----- */
+  /* ----- Character panel ----- */
   .cz { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 16px; align-items: start; }
   .cz-stage { position: sticky; top: 0; display: grid; justify-items: center; gap: 12px; padding: 14px 10px;
     background: #fff3e0; border: 2px solid #ecd9bb; border-radius: 16px; }
@@ -121,7 +121,7 @@
     .cz-side { display: grid; gap: 10px; justify-items: start; }
   }
   @media (prefers-reduced-motion: reduce) { .cz-petpv { animation: none; } }
-  /* ----- Popup gian hàng ----- */
+  /* ----- Stall popup ----- */
   .shop-top { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; }
   .shop-top canvas { width: 48px; height: 48px; image-rendering: pixelated; flex: none; }
   .shop-top .say { position: relative; background: #fff; border: 2px solid #3e2723; border-radius: 10px; padding: 6px 10px;
@@ -199,7 +199,7 @@
     padding: 8px 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,.3); }
   #avaBtn canvas { width: 24px; height: 24px; image-rendering: pixelated; }
-  /* Điều khiển cảm ứng: chỉ hiện khi máy có màn hình cảm ứng (body.touch) */
+  /* Touch controls: shown only on touch devices (body.touch) */
   #stick, #actBtn { display: none; }
   body.touch #stick { display: block; position: fixed; width: 132px; height: 132px; border-radius: 50%;
     left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
@@ -251,7 +251,7 @@
 </div>
 
 <script>
-// ===== Dữ liệu gian hàng =====
+// ===== Stall data =====
 const STALLS = [
   { name: "Áo Quần",   color: "#e53935", icon: "👕" },
   { name: "Giày Dép",  color: "#8e24aa", icon: "👟" },
@@ -263,9 +263,9 @@ const STALLS = [
   { name: "Bánh Kẹo",  color: "#f06292", icon: "🍬" },
 ];
 
-// ===== Sản phẩm từng gian =====
-// e: emoji tạm thay ảnh; img: link ảnh thật (để trống thì dùng emoji); old: giá gốc nếu đang giảm;
-// opts: tuỳ chọn hiển thị; links: link Shopee / TikTok (affiliate) sẽ gắn sau.
+// ===== Products per stall =====
+// e: emoji placeholder for the photo; img: real image URL (empty falls back to the emoji); old: original price when discounted;
+// opts: selectable options shown in the detail view; links: Shopee / TikTok (affiliate) links, to be filled in later.
 const P = (e, name, price, old, rating, sold, desc, opts) =>
   ({ e, name, price, old, rating, sold, desc, opts, img: "", links: { shopee: "", tiktok: "" } });
 const SIZE = (...v) => ({ label: "Kích cỡ", values: v }), COLOR = (...v) => ({ label: "Màu", values: v }), KIND = (...v) => ({ label: "Loại", values: v });
@@ -305,11 +305,11 @@ const PRODUCTS = [
 ];
 STALLS.forEach((s, i) => s.items = PRODUCTS[i]);
 
-// ===== Bố cục thế giới =====
-const WORLD = { w: 1440, h: 1008 }; // 30 x 21 ô, mỗi ô 48px
+// ===== World layout =====
+const WORLD = { w: 1440, h: 1008 }; // 30 x 21 tiles, 48px each
 const STALL_W = 220, STALL_H = 190, ZONE_H = 70;
-const ROAD = { y: 336, h: 288 }; // dải giữa hai dãy gian (hàng ô 7..12), đường đất uốn lượn trong dải này
-// tâm đường (tính theo hàng ô) tại cột c: hai sóng sin chồng nhau cho đường ngoằn ngoèo tự nhiên
+const ROAD = { y: 336, h: 288 }; // the strip between the two rows of stalls (tile rows 7..12); the dirt road winds inside it
+// road centre (in tile rows) at column c: two overlapping sine waves give a natural winding country road
 const centerAt = c => (ROAD.y + ROAD.h / 2) / 48 + 1.4 * Math.sin(c * 0.42) + 0.6 * Math.sin(c * 0.9 + 1.3);
 const KINDS = ["clothes", "shoes", "accessories", "cosmetics", "food", "drinks", "fruit", "candy"];
 STALLS.forEach((s, i) => {
@@ -318,28 +318,28 @@ STALLS.forEach((s, i) => {
   s.x = 140 + col * 290;
   s.y = top ? ROAD.y - STALL_H - 10 : ROAD.y + ROAD.h + 10;
   s.w = STALL_W; s.h = STALL_H; s.top = top;
-  // vùng tương tác: dải ngay trước mặt gian (phía đường)
+  // interaction zone: the strip right in front of the stall (road side)
   s.zone = { x: s.x + 20, y: top ? s.y + s.h : s.y - ZONE_H, w: s.w - 40, h: ZONE_H };
 });
 const TREES = [[60,120],[60,860],[1340,120],[1340,860],[700,60],[700,940],[420,940],[980,60]];
 const SOLIDS = [...STALLS.map(s => ({ x: s.x, y: s.y, w: s.w, h: s.h })),
                 ...TREES.map(([x,y]) => ({ x: x-22, y: y-10, w: 44, h: 30 }))];
 
-// ===== Asset Kenney (CC0): Tiny Town + Roguelike Characters, nhúng base64 để chạy ở mọi nơi =====
+// ===== Kenney assets (CC0): Tiny Town + Roguelike Characters, embedded as base64 so it runs anywhere =====
 const TOWN_PNG = "data:image/png;base64,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";
 const CHARS_PNG = "data:image/png;base64,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";
 const loadImg = src => new Promise((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = src; });
-const T = 48; // 1 ô 16px gốc phóng 3 lần
+const T = 48; // one 16px source tile scaled up 3x
 let TOWN, CHARS;
-// Tiny Town (tilemap_packed): lưới 12x11 ô 16px sát nhau
+// Tiny Town (tilemap_packed): 12x11 grid of 16px tiles with no gaps
 const tile = (c, r, x, y, g = ctx) => g.drawImage(TOWN, c * 16, r * 16, 16, 16, x, y, T, T);
 
-// Roguelike Characters: ô 16px cách nhau 1px; nhân vật ghép từ nhiều lớp chồng lên nhau
+// Roguelike Characters: 16px tiles with a 1px gap; characters are built from stacked layers
 const PARTS = {
   skin:      { label: "Màu da",   opts: [[1,0],[1,1],[1,2],[1,3]] },
   shirt:     { label: "Áo",       opts: [[6,0],[8,0],[10,0],[12,0],[14,0],[16,0],[6,5],[8,5],[10,5],[14,5],[16,5],[12,8],[8,8],[7,2]] },
-  pants:     { label: "Quần",     opts: [0,1,2,5,6,7,8] },               // hàng ở cột 3 (quần) + cột 4 (giày)
-  hair:      { label: "Kiểu tóc", opts: [null,[0,0],[1,0],[3,1],[2,0],[3,0]] }, // lệch trong nhóm màu tóc; null = trọc
+  pants:     { label: "Quần",     opts: [0,1,2,5,6,7,8] },               // row in column 3 (pants) + column 4 (shoes)
+  hair:      { label: "Kiểu tóc", opts: [null,[0,0],[1,0],[3,1],[2,0],[3,0]] }, // offset within the hair colour group; null = bald
   hairColor: { label: "Màu tóc",  opts: [[19,0],[23,0],[19,4],[23,4],[19,8]] },
   hat:       { label: "Mũ",       opts: [null,[28,2],[30,3],[29,5],[31,4],[28,7],[29,8],[30,0]] },
 };
@@ -358,9 +358,9 @@ function sprite(av) {
   }
   return spriteCache.get(key);
 }
-// Bộ Kenney chỉ có dáng đứng, nên tự sinh khung bước chân: nhấc một chân lên 1px (để hở mặt đất),
-// hai bàn tay đánh lệch nhau 1px. Vòng lặp 4 khung: đứng, bước trái, đứng, bước phải.
-// Bố cục sprite 16x16: chân ở hàng 13-15 (cột 3-12), bàn tay ở hàng 10-14 (cột 0-2 và 13-15).
+// The Kenney pack only has a standing pose, so walk frames are generated: one foot is lifted 1px (leaving a gap above the ground)
+// and the two hands are shifted 1px in opposite directions. The 4-frame loop is: stand, left step, stand, right step.
+// Sprite layout 16x16: feet on rows 13-15 (columns 3-12), hands on rows 10-14 (columns 0-2 and 13-15).
 function makeStep(base, side) {
   const cv = document.createElement("canvas"); cv.width = cv.height = 16;
   const g = cv.getContext("2d"), src = base.getContext("2d").getImageData(0, 0, 16, 16).data, out = g.createImageData(16, 16);
@@ -376,7 +376,7 @@ function makeStep(base, side) {
     else if (hand) put(x, y, x, y + (lifted(x) ? -1 : 1));
     else put(x, y, x, y);
   }
-  for (let y = 12; y < 15; y++) for (let x = 3; x <= 12; x++) if (lifted(x)) put(x, y, x, y + 1); // chân nhấc đè lên mép thân
+  for (let y = 12; y < 15; y++) for (let x = 3; x <= 12; x++) if (lifted(x)) put(x, y, x, y + 1); // the lifted foot overlaps the edge of the body
   g.putImageData(out, 0, 0);
   return cv;
 }
@@ -388,7 +388,7 @@ function framesOf(av) {
 }
 const randomAvatar = () => Object.fromEntries(Object.entries(PARTS).map(([k, p]) =>
   [k, k === "hat" && Math.random() < 0.6 ? 0
-      : k === "skin" && Math.random() < 0.9 ? Math.random() * 3 | 0 // da xanh (orc) hiếm thôi
+      : k === "skin" && Math.random() < 0.9 ? Math.random() * 3 | 0 // green (orc) skin is rare
       : Math.random() * p.opts.length | 0]));
 const DEFAULT_AVATAR = { skin: 0, shirt: 2, pants: 0, hair: 1, hairColor: 0, hat: 0 };
 const loadAvatar = () => {
@@ -400,12 +400,12 @@ const loadAvatar = () => {
 };
 const saveAvatar = a => { try { localStorage.setItem("cho.avatar2", JSON.stringify(a)); } catch {} };
 
-// ===== Nhân vật =====
+// ===== Characters =====
 function makeChar(x, y, name, avatar) {
   return { x, y, name, avatar, dir: 1, walk: 0, moving: false, target: null, stuck: 0,
            pendingStall: null, wait: 0 };
 }
-// Hồ sơ người chơi: tên, màu tên, trạng thái, thú cưng (lưu trên trình duyệt)
+// Player profile: name, name colour, status, pet (saved in the browser)
 const NAME_COLORS = ["#ffeb3b", "#ffffff", "#80deea", "#a5d6a7", "#f48fb1", "#ffab91", "#ce93d8"];
 const STATUSES = ["", "🛍️", "😋", "💸", "☕", "🎉", "😎", "💤"];
 const PETS = [null, "🐶", "🐱", "🐰", "🐥", "🐷", "🦆"];
@@ -427,26 +427,26 @@ const profile = loadProfile();
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const player = makeChar(140, ROAD.y + ROAD.h / 2, profile.name, loadAvatar());
 const playerLabel = () => `${STATUSES[profile.status]} ${player.name}`.trim();
-// Thú cưng chạy theo sau lưng người chơi
+// The pet follows the player
 const pet = { x: player.x - 34, y: player.y + 4, dir: 1, moving: false, walk: 0 };
 function updatePet(dt) {
   if (!PETS[profile.pet]) return;
   const tx = player.x - player.dir * 34, ty = player.y + 4, dx = tx - pet.x, dy = ty - pet.y, d = Math.hypot(dx, dy);
-  if (d > 300) { pet.x = tx; pet.y = ty; return; } // bị bỏ quá xa thì nhảy tới luôn
+  if (d > 300) { pet.x = tx; pet.y = ty; return; } // too far behind: jump straight to the target
   pet.moving = d > 6;
   if (!pet.moving) return;
-  const sp = Math.min(d, Math.max(1.2 * dt, d * (1 - Math.pow(0.92, dt)))); // đuổi theo nhanh khi xa, chậm lại khi gần
+  const sp = Math.min(d, Math.max(1.2 * dt, d * (1 - Math.pow(0.92, dt)))); // catch up fast when far away, slow down when close
   pet.x += dx / d * sp; pet.y += dy / d * sp; pet.walk += sp * 0.15;
   if (Math.abs(dx) > 1) pet.dir = dx > 0 ? 1 : -1;
 }
 function drawPet(p = pet, e = PETS[profile.pet]) {
   const hop = p.moving ? Math.abs(Math.sin(p.walk)) * 6 : 0;
   ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(p.x, p.y, 10, 4, 0, 0, 7); ctx.fill();
-  ctx.save(); ctx.translate(p.x, p.y - 13 - hop); if (p.dir > 0) ctx.scale(-1, 1); // emoji thú nhìn sang trái
+  ctx.save(); ctx.translate(p.x, p.y - 13 - hop); if (p.dir > 0) ctx.scale(-1, 1); // the pet emoji faces left
   emoji(e, 0, 0, 24); ctx.restore();
 }
 const NAMES = ["Cô Ba","Chú Tư","Bé Na","Anh Hai","Chị Mai","Ông Sáu","Bé Bin"];
-// ===== Chủ tiệm: mỗi gian một người, đứng ngay cạnh lối vào, chào khách và rao hàng =====
+// ===== Shopkeepers: one per stall, standing next to the entrance, greeting customers and calling out their goods =====
 const KEEPERS = [
   { name: "Cô Hoa",   av: { skin: 0, shirt: 4,  pants: 1, hair: 2, hairColor: 3, hat: 0 },
     greet: ["Vào xem đồ mới về nè em ơi!", "Áo đẹp giá mềm, thử đi con!"], ads: ["Áo thun đồng giá 120k nè!", "Sale 50% hôm nay thôi nha!"] },
@@ -474,13 +474,13 @@ const keepers = STALLS.map((st, i) => {
 const pick = a => a[Math.random() * a.length | 0];
 function say(k, text, secs, t) {
   k.bubble = { text, from: t, until: t + secs };
-  const vol = Math.max(0, 1 - Math.hypot(player.x - k.x, player.y - k.y) / 420); // càng xa tiếng càng nhỏ
+  const vol = Math.max(0, 1 - Math.hypot(player.x - k.x, player.y - k.y) / 420); // the farther away, the quieter
   if (vol > .05) sfx("talk", keepers.indexOf(k), vol);
 }
 
 const npcs = NAMES.map((n, i) => makeChar(300 + i * 140, ROAD.y + 60 + (i % 3) * 80, n, randomAvatar()));
 
-const BODY = { w: 22, h: 14 }; // hộp va chạm ở chân
+const BODY = { w: 22, h: 14 }; // collision box at the feet
 function blocked(x, y) {
   const l = x - BODY.w/2, r = x + BODY.w/2, t = y - BODY.h, b = y;
   if (l < 0 || r > WORLD.w || t < 0 || b > WORLD.h) return true;
@@ -492,7 +492,7 @@ function tryMove(c, dx, dy) {
   if (!blocked(c.x, c.y + dy)) c.y += dy;
   c.moving = Math.abs(c.x - ox) + Math.abs(c.y - oy) > 0.1;
   if (Math.abs(dx) > 0.1) c.dir = dx > 0 ? 1 : -1;
-  if (c.moving) c.walk += Math.hypot(c.x - ox, c.y - oy) * 0.055; // nhịp bước theo quãng đường đã đi
+  if (c.moving) c.walk += Math.hypot(c.x - ox, c.y - oy) * 0.055; // step rhythm follows the distance walked
   return c.moving;
 }
 function moveToward(c, speed, dt = 1) {
@@ -514,7 +514,7 @@ addEventListener("keydown", e => {
     else if (view && view.i !== null && (e.key === "ArrowLeft" || e.key === "ArrowRight")) stepItem(e.key === "ArrowRight" ? 1 : -1);
     return;
   }
-  if (e.target && e.target.id === "chatIn") return; // đang gõ tin nhắn
+  if (e.target && e.target.id === "chatIn") return; // typing a chat message
   if (e.key === "Enter") { e.preventDefault(); openChat(); return; }
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === "e" && nearStall) openStall(nearStall);
@@ -537,11 +537,11 @@ canvas.addEventListener("pointerdown", e => {
   }
 });
 
-// ===== Popup gian hàng =====
+// ===== Stall popup =====
 const $ = id => document.getElementById(id);
 const fmt = n => n.toLocaleString("vi-VN") + "đ";
-// Mở/đóng popup có hiệu ứng: hiện khung trước, sang khung hình sau mới thêm class "open" để CSS chạy transition;
-// khi đóng thì bỏ "open", đợi hiệu ứng xong mới ẩn hẳn. modalShown đổi ngay để game dừng/chạy tức thì.
+// Animated open/close: show the element first, add the "open" class on the next frame so the CSS transition runs;
+// on close, remove "open" and hide only after the animation ends. modalShown flips immediately so the game pauses/resumes at once.
 let modalShown = false, modalTimer;
 const modalOpen = () => modalShown;
 const MODAL_OUT_MS = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 200;
@@ -554,7 +554,7 @@ function hideModal() {
   const m = $("modal"); modalShown = false; m.classList.remove("open");
   clearTimeout(modalTimer); modalTimer = setTimeout(() => { if (!modalShown) m.style.display = "none"; }, MODAL_OUT_MS);
 }
-// Popup gian hàng có 2 màn: danh sách món (view.i = null) và chi tiết một món (view.i = chỉ số)
+// The stall popup has two screens: the product list (view.i = null) and one product's detail (view.i = index)
 let view = null;
 const soldTxt = n => n >= 1000 ? (n / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + "k" : n;
 const picHtml = p => p.img ? `<img src="${p.img}" alt="${p.name}">` : `<span class="emo" aria-hidden="true">${p.e}</span>`;
@@ -570,7 +570,7 @@ function openStall(s) {
 function renderShop() {
   const { s, i } = view, items = s.items, g = $("grid"), k = KEEPERS[STALLS.indexOf(s)];
   $("mhead").style.background = s.color;
-  g.style.cssText = `--c:${s.color};--c1:${s.color}22;--c2:${s.color}55;grid-template-columns:repeat(2, minmax(0, 1fr))`; // 4 món: lưới 2x2
+  g.style.cssText = `--c:${s.color};--c1:${s.color}22;--c2:${s.color}55;grid-template-columns:repeat(2, minmax(0, 1fr))`; // 4 products: 2x2 grid
   if (i === null) {
     $("mtitle").textContent = `${s.icon} Gian ${s.name}`;
     g.innerHTML = `<div class="shop-top"><canvas width="16" height="16"></canvas><div class="say"><b>${k.name}:</b> ${esc(player.name)} ơi! ${k.greet[0]}</div></div>` +
@@ -618,17 +618,17 @@ $("grid").addEventListener("click", e => {
   else if (act === "prev" || act === "next") stepItem(act === "next" ? 1 : -1);
   else if (act === "opt") { view.opt = +el.dataset.v; renderShop(); }
 });
-// Vuốt ngang trên ảnh để đổi món (điện thoại)
+// Swipe horizontally on the image to change product (phones)
 let swipeX = null;
 $("grid").addEventListener("pointerdown", e => { if (view && view.i !== null && e.target.closest(".hero") && !e.target.closest(".nav")) swipeX = e.clientX; });
 $("grid").addEventListener("pointerup", e => {
   if (swipeX === null) return; const dx = e.clientX - swipeX; swipeX = null;
   if (Math.abs(dx) > 40) stepItem(dx < 0 ? 1 : -1);
 });
-// ===== Bảng nhân vật: 2 thẻ "Thông tin" và "Bề ngoài", chọn bằng hình thay vì bấm mũi tên =====
+// ===== Character panel: two tabs, "Info" and "Look", picking from thumbnails instead of arrow buttons =====
 let czTab = "info", czCat = "skin";
 const CZ_CATS = [["skin", "Màu da"], ["hair", "Tóc"], ["shirt", "Áo"], ["pants", "Quần"], ["hat", "Mũ"]];
-// Lấy màu chủ đạo của một ô trong sheet nhân vật để làm ô màu (da, tóc)
+// Take the dominant colour of a tile in the character sheet to use as a colour swatch (skin, hair)
 const tileColor = (() => { const cache = {}; return ([c, r]) => {
   const key = c + "," + r; if (cache[key]) return cache[key];
   const cv = document.createElement("canvas"); cv.width = cv.height = 16; const g = cv.getContext("2d");
@@ -690,7 +690,7 @@ function renderPicker() {
   $("grid").querySelectorAll("canvas[data-thumb]").forEach(c => c.getContext("2d").drawImage(sprite(JSON.parse(c.dataset.thumb)), 0, 0));
   drawStage(performance.now() / 1000);
 }
-// Sân cỏ xem trước: nhân vật bước tại chỗ để thấy luôn animation đi bộ
+// Preview lawn: the character walks in place so the walk animation is visible
 function drawStage(t) {
   const cv = $("pv"); if (!cv) return;
   const g = cv.getContext("2d"); g.imageSmoothingEnabled = false;
@@ -715,7 +715,7 @@ $("grid").addEventListener("click", e => {
 $("grid").addEventListener("input", e => {
   if (e.target.id !== "pname") return;
   profile.name = e.target.value.slice(0, NAME_MAX); player.name = profile.name.trim() || "Bạn"; saveProfile(profile);
-  document.querySelector(".cz-tag").textContent = playerLabel(); // cập nhật tại chỗ để ô nhập không mất focus
+  document.querySelector(".cz-tag").textContent = playerLabel(); // update in place so the input does not lose focus
   $("pcount").textContent = `${profile.name.length}/${NAME_MAX}`;
 });
 $("grid").addEventListener("keydown", e => { if (e.target.id === "pname" && e.key === "Enter") e.target.blur(); });
@@ -728,7 +728,7 @@ $("mclose").onclick = closeStall;
 $("modal").addEventListener("pointerdown", e => { if (e.target.id === "modal") closeStall(); });
 $("hint").onclick = () => nearStall && openStall(nearStall);
 
-// ===== Điều khiển cảm ứng: joystick ảo + nút "Vào gian" =====
+// ===== Touch controls: virtual joystick + "Enter stall" button =====
 const joy = { active: false, id: null, dx: 0, dy: 0 };
 const enableTouch = () => document.body.classList.add("touch");
 const coarse = matchMedia("(pointer: coarse)");
@@ -736,7 +736,7 @@ if (coarse.matches || navigator.maxTouchPoints > 0) enableTouch();
 coarse.addEventListener?.("change", e => e.matches && enableTouch());
 addEventListener("pointerdown", e => { if (e.pointerType === "touch") enableTouch(); }, true);
 addEventListener("touchstart", enableTouch, { capture: true, passive: true, once: true });
-const stick = $("stick"), knob = $("knob"), STICK_R = 50; // bán kính kéo tối đa của núm
+const stick = $("stick"), knob = $("knob"), STICK_R = 50; // maximum drag radius of the knob
 function moveKnob(e) {
   const r = stick.getBoundingClientRect();
   let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
@@ -752,7 +752,7 @@ stick.addEventListener("pointermove", e => { if (joy.active && e.pointerId === j
 const endJoy = e => { if (e.pointerId !== joy.id) return; joy.active = false; joy.dx = joy.dy = 0; knob.style.transform = ""; };
 stick.addEventListener("pointerup", endJoy); stick.addEventListener("pointercancel", endJoy);
 $("actBtn").addEventListener("click", () => nearStall && openStall(nearStall));
-let actFor; // gian mà nút đang hiển thị, để chỉ cập nhật DOM khi đổi
+let actFor; // the stall the button is currently showing, so the DOM is only updated when it changes
 function updateActBtn() {
   const closed = nearStall && isClosed(nearStall), key = nearStall ? STALLS.indexOf(nearStall) + (closed ? 100 : 0) : -1;
   if (actFor === key) return; actFor = key;
@@ -763,8 +763,8 @@ function updateActBtn() {
 
 // ===== Update =====
 let nearStall = null;
-// Camera: đích là nhân vật (cộng một khoảng nhìn trước theo hướng đang đi), camera tiến dần về đích
-// theo hàm mũ nên mượt ở mọi tốc độ khung hình. snap = true để nhảy thẳng tới đích (lúc mới vào game).
+// Camera: the target is the player plus a look-ahead in the direction of travel; the camera eases toward it
+// exponentially so it looks smooth at any frame rate. snap = true jumps straight to the target (on game start).
 const CAM_FOLLOW = 0.1, CAM_LOOKAHEAD = 60;
 let lookX = 0, lookY = 0;
 function updateCamera(dt, snap = false) {
@@ -789,7 +789,7 @@ function update(dt) {
     let dy = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
     let speed = 3.2;
     const jm = Math.hypot(joy.dx, joy.dy);
-    if (!dx && !dy && joy.active && jm > 0.15) { dx = joy.dx; dy = joy.dy; speed = 3.2 * Math.min(1, jm * 1.2); } // nghiêng nhẹ thì đi chậm
+    if (!dx && !dy && joy.active && jm > 0.15) { dx = joy.dx; dy = joy.dy; speed = 3.2 * Math.min(1, jm * 1.2); } // a gentle tilt walks slowly
     if (dx || dy) {
       player.target = null; player.pendingStall = null;
       const l = Math.hypot(dx, dy); tryMove(player, dx / l * speed * dt, dy / l * speed * dt);
@@ -801,7 +801,7 @@ function update(dt) {
     if (n.hidden) continue;
     if (n.wait > 0) { n.wait -= dt; n.moving = false; continue; }
     if (!n.target) {
-      // NPC đi dạo: ghé trước một gian ngẫu nhiên hoặc một điểm trên đường
+      // NPC stroll: visit a random stall front or a point on the road
       const s = STALLS[Math.random() * STALLS.length | 0];
       n.target = Math.random() < 0.6
         ? { x: s.zone.x + Math.random() * s.zone.w, y: s.zone.y + 20 + Math.random() * 30 }
@@ -815,7 +815,7 @@ function update(dt) {
   const t = performance.now() / 1000;
   for (const k of keepers) {
     const d = Math.hypot(player.x - k.x, player.y - k.y);
-    if (d < 260) k.dir = player.x >= k.x ? 1 : -1; // quay mặt về phía khách
+    if (d < 260) k.dir = player.x >= k.x ? 1 : -1; // face the customer
     if (k.bubble && t > k.bubble.until) k.bubble = null;
     if (nearStall === k.stall && prevStall !== k.stall) {
       if (isClosed(k.stall)) say(k, "Tiệm đóng cửa rồi, mai ghé nha!", 3.5, t);
@@ -831,23 +831,23 @@ function update(dt) {
   updateCamera(dt);
 }
 
-// ===== Vẽ =====
+// ===== Rendering =====
 let groundCv;
 function buildGround() {
   groundCv = document.createElement("canvas"); groundCv.width = WORLD.w; groundCv.height = WORLD.h;
   const g = groundCv.getContext("2d"); g.imageSmoothingEnabled = false;
   const C = WORLD.w / T, R = WORLD.h / T;
-  let seed = 7; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647; // map cố định mỗi lần tải
+  let seed = 7; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647; // fixed map on every load
   for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { const v = rnd(); tile(v < 0.8 ? 1 : v < 0.93 ? 0 : 2, 0, c * T, r * T, g); }
 
-  // Đường đất quê: mỗi cột có một tâm đường uốn theo 2 sóng sin, đường rộng ~3 ô
+  // Country dirt road: each column has a road centre that bends along 2 sine waves; the road is ~3 tiles wide
   const dirt = Array.from({ length: R }, () => Array(C).fill(false));
   const set = (r, c) => { if (r >= 0 && r < R && c >= 0 && c < C) dirt[r][c] = true; };
   for (let c = 0; c < C; c++) {
     const y = centerAt(c);
     for (let r = Math.round(y - 1.3); r <= Math.round(y + 1.3); r++) set(r, c);
   }
-  // Lối mòn rẽ từ đường chính vào trước mỗi gian hàng (rộng 2 ô)
+  // Side paths branching off the main road to the front of each stall (2 tiles wide)
   STALLS.forEach(st => {
     const c0 = Math.round((st.x + st.w / 2) / T) - 1;
     const edge = Math.floor((st.top ? st.y + st.h : st.y) / T);
@@ -857,7 +857,7 @@ function buildGround() {
       else for (let r = y; r <= edge; r++) set(r, c);
     }
   });
-  // Ô ở viền đường lấy góc/cạnh theo 4 ô hàng xóm; ngoài mép bản đồ coi như vẫn là đất
+  // Tiles on the road edge pick a corner/edge tile from their 4 neighbours; outside the map edge counts as dirt
   const isDirt = (r, c) => r < 0 || r >= R || c < 0 || c >= C || dirt[r][c];
   for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
     if (!dirt[r][c]) continue;
@@ -865,7 +865,7 @@ function buildGround() {
     const tc = !w && e ? 0 : !e && w ? 2 : 1, tr = !n && so ? 1 : !so && n ? 3 : 2;
     tile(tc, tr, c * T, r * T, g);
   }
-  // bụi cây, nấm lác đác trên bãi cỏ (không mọc trên đường)
+  // bushes and mushrooms scattered on the grass (never on the road)
   for (let i = 0; i < 45; i++) {
     const c = rnd() * C | 0, r = rnd() * R | 0;
     if (dirt[r][c] || SOLIDS.some(o => c * T < o.x + o.w + 8 && c * T + T > o.x - 8 && r * T < o.y + o.h + 8 && r * T + T > o.y - 8)) continue;
@@ -879,7 +879,7 @@ function drawGate() {
   ctx.fillStyle = "#ffd54f"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.fillText("CHỢ", 44, ROAD.y - 23);
 }
-// ===== Ngày/đêm theo giờ Việt Nam + theme (người chơi tự chọn) =====
+// ===== Day/night on Vietnam time + theme (chosen by the player) =====
 const THEMES = {
   default: { name: "Mặc định", icon: "🏮", desc: "Chợ quê thường ngày" },
   tet: { name: "Tết", icon: "🧧", desc: "Mai đào, đèn lồng đỏ, hoa rơi", particles: "petals", strings: "tet",
@@ -914,10 +914,10 @@ const scene = (() => {
 const saveScene = () => { try { localStorage.setItem(SCENE_KEY, JSON.stringify(scene)); } catch {} };
 const theme = () => THEMES[scene.theme];
 
-// --- Giờ Việt Nam (UTC+7), làm mới mỗi 0,5 giây
+// --- Vietnam time (UTC+7), refreshed every 0.5 seconds
 const vnFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
 const vnCache = { at: -1e9, h: 12 };
-let hourOverride = null; // chỉ dùng khi thử nghiệm trong console
+let hourOverride = null; // only used for testing in the console
 function vnHour() {
   const now = performance.now();
   if (now - vnCache.at > 500) {
@@ -929,7 +929,7 @@ function vnHour() {
 }
 const sceneHour = () => hourOverride ?? (scene.time === "day" ? 12 : scene.time === "night" ? 21 : vnHour());
 
-// --- Màu phủ toàn cảnh theo giờ: [giờ, r, g, b, độ đậm]
+// --- Scene tint by hour: [hour, r, g, b, opacity]
 const AMB_KEYS = [[0, 10, 14, 48, .62], [5, 20, 24, 70, .56], [6, 255, 160, 110, .26], [7, 255, 210, 160, .08], [8, 255, 255, 255, 0],
   [15.5, 255, 255, 255, 0], [16.5, 255, 205, 120, .12], [17.7, 255, 140, 70, .28], [18.6, 70, 45, 115, .48], [20, 14, 18, 58, .6], [24, 10, 14, 48, .62]];
 function sampleAmb(h) {
@@ -939,13 +939,13 @@ function sampleAmb(h) {
   }
   const l = AMB_KEYS.at(-1); return { r: l[1], g: l[2], b: l[3], a: l[4] };
 }
-function targetAmb() { // chồng màu của theme (ví dụ mưa) lên màu theo giờ
+function targetAmb() { // layer the theme's own tint (for example rain) over the time-of-day tint
   const base = sampleAmb(sceneHour()), th = theme().amb;
   if (!th) return base;
   const a = base.a + th.a * (1 - base.a), w1 = a ? base.a / a : 0, w2 = 1 - w1;
   return { r: base.r * w1 + th.r * w2, g: base.g * w1 + th.g * w2, b: base.b * w1 + th.b * w2, a };
 }
-const amb = { r: 255, g: 255, b: 255, a: 0 }; // màu đang hiển thị, trôi dần tới màu đích
+const amb = { r: 255, g: 255, b: 255, a: 0 }; // the colour currently shown, easing toward the target colour
 let lit = 0, closedLate = false, marketNightOn = false, flash = 0, nextThunder = 0, parts = [], flies = [], puddles = [];
 const isClosed = s => closedLate && !["food", "drinks"].includes(s.kind);
 const pad2 = n => String(n).padStart(2, "0");
@@ -956,7 +956,7 @@ function updateScene(dt) {
   lit = Math.max(0, Math.min(1, (amb.a - 0.14) / 0.34));
   document.body.classList.toggle("night", lit > 0.5);
   const h = sceneHour();
-  closedLate = scene.time === "auto" && (h >= 23 || h < 6); // khuya: chỉ còn gian ăn uống mở
+  closedLate = scene.time === "auto" && (h >= 23 || h < 6); // late night: only the food and drink stalls stay open
   marketNightOn = h >= 18 && h < 23;
   npcs.forEach((n, i) => { n.hidden = closedLate && i % 2 === 1; });
   const t = performance.now() / 1000;
@@ -978,7 +978,7 @@ function initParticles() {
   parts = Array.from({ length: n }, () => ({ x: Math.random() * (cam.w || 800), y: Math.random() * (cam.h || 600), s: Math.random(), ph: Math.random() * 6.28 }));
   nextThunder = performance.now() / 1000 + 6 + Math.random() * 8;
 }
-function initFlies() { // đom đóm bay ở rìa chợ
+function initFlies() { // fireflies flying around the edge of the market
   flies = Array.from({ length: 34 }, () => {
     const r = Math.random(); let x, y;
     if (r < .35) { x = Math.random() * 1440; y = 20 + Math.random() * 100; } else if (r < .7) { x = Math.random() * 1440; y = 850 + Math.random() * 130; }
@@ -996,7 +996,7 @@ function updateSceneBtn(force) {
   b.querySelector(".ic").textContent = ic; b.querySelector(".t").textContent = txt;
 }
 
-// --- Lớp ánh sáng: canvas phụ độ phân giải thấp, tô màu tối rồi "khoét" các vùng sáng
+// --- Light layer: a low-resolution helper canvas, filled with the dark tint and then "punched out" where there is light
 const lightCv = document.createElement("canvas"), lightG = lightCv.getContext("2d"), LS = 0.5;
 const GLOW = { clothes: "255,225,190", shoes: "255,215,160", accessories: "190,220,255", cosmetics: "255,190,225", food: "255,170,90", drinks: "170,235,230", fruit: "255,225,130", candy: "255,175,215" };
 function collectLights(t) {
@@ -1004,14 +1004,14 @@ function collectLights(t) {
   STALLS.forEach(s => {
     const g = GLOW[s.kind], cx = s.x + s.w / 2;
     if (isClosed(s)) { add(cx, s.y - 18, 50, "255,230,170", .5); return; }
-    add(cx, s.y - 18, 85, g, 1);                                  // biển hiệu
-    add(cx, s.top ? s.y + s.h - 30 : s.y + 80, 130, g, .95);      // quầy hàng
+    add(cx, s.y - 18, 85, g, 1);                                  // sign
+    add(cx, s.top ? s.y + s.h - 30 : s.y + 80, 130, g, .95);      // counter
     add(s.x + 12, s.y + 50, 60, g, .8); add(s.x + s.w - 12, s.y + 50, 60, g, .8);
   });
   keepers.forEach(k => add(k.x, k.y - 24, 55, "255,220,170", .6));
   npcs.forEach(n => { if (!n.hidden) add(n.x, n.y - 24, 42, "255,235,200", .45); });
   remotes.forEach(r => add(r.x, r.y - 24, 70, "255,235,190", .8));
-  add(player.x, player.y - 24, 105, "255,235,190", 1);            // vòng sáng quanh người chơi
+  add(player.x, player.y - 24, 105, "255,235,190", 1);            // glow around the player
   theme().lights?.(t, add);
   return L;
 }
@@ -1033,7 +1033,7 @@ function drawLighting(t) {
     vis.push([x, y, r, col, i]);
   }
   ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(lightCv, cam.x, cam.y, cam.w, cam.h);
-  ctx.globalCompositeOperation = "lighter"; // ánh sáng ấm cộng thêm
+  ctx.globalCompositeOperation = "lighter"; // extra warm light, added on top
   for (const [x, y, r, col, i] of vis) {
     const gr = ctx.createRadialGradient(x, y, 0, x, y, r * .7);
     gr.addColorStop(0, `rgba(${col},${.22 * i})`); gr.addColorStop(1, `rgba(${col},0)`);
@@ -1053,7 +1053,7 @@ function drawFireflies(t) {
   ctx.restore();
 }
 
-// --- Hạt rơi theo theme (vẽ theo toạ độ màn hình) và tia chớp
+// --- Theme particles (drawn in screen coordinates) and lightning
 function drawParticles(t) {
   if (flash > 0.02) { ctx.fillStyle = `rgba(255,255,255,${flash * .55})`; ctx.fillRect(0, 0, cam.w, cam.h); }
   const ty = theme().particles; if (!ty) return;
@@ -1067,7 +1067,7 @@ function drawParticles(t) {
   for (const p of parts) { const a = .2 + .6 * (Math.sin(t * 3 + p.ph) + 1) / 2; ctx.fillStyle = `rgba(255,220,130,${a})`; const r = 1 + p.s * 2; ctx.fillRect(p.x - r * 2, p.y - .5, r * 4, 1); ctx.fillRect(p.x - .5, p.y - r * 2, 1, r * 4); }
   ctx.restore();
 }
-function drawGroundFx(t) { // gợn nước trong các vũng (theme mưa)
+function drawGroundFx(t) { // ripples in the puddles (rain theme)
   for (const p of puddles) { const k = (t * .8 + p.ph) % 1; ctx.strokeStyle = `rgba(255,255,255,${.5 * (1 - k)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w * (.3 + .7 * k), p.w * .35 * (.3 + .7 * k), 0, 0, 7); ctx.stroke(); }
 }
 function themeGround(g, dirt, rnd) {
@@ -1086,7 +1086,7 @@ function themeGround(g, dirt, rnd) {
   }
 }
 
-// --- Đồ trang trí theo theme
+// --- Theme decorations
 const DECOR_POS = [[395, 250], [685, 250], [975, 250], [395, 730], [685, 730], [975, 730], [80, 190], [80, 820], [1380, 300], [1380, 700]];
 const decorPositions = () => scene.theme === "noel" ? DECOR_POS.slice(0, 6) : scene.theme === "tet" ? DECOR_POS : [];
 function themeDecorItems(t) {
@@ -1112,8 +1112,8 @@ function xmasTree(x, y, t, idx) {
   starPath(x, y - 84, 8); ctx.fillStyle = "#ffd54f"; ctx.fill(); ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.stroke();
   rect(x - 32, y + 2, 14, 12, "#e53935"); rect(x + 18, y + 4, 12, 10, "#1e88e5");
 }
-// Dây đèn giăng ngang đường (Tết: đèn lồng, Trung thu: đèn ông sao, Noel: bóng đèn nháy)
-const STRING_BASES = () => [ROAD.y + 4, ROAD.y + ROAD.h - 104]; // dây thứ hai nằm giữa đường, không che huy hiệu gian bên dưới
+// String lights hung across the road (Tet: lanterns, Mid-Autumn: star lanterns, Christmas: blinking bulbs)
+const STRING_BASES = () => [ROAD.y + 4, ROAD.y + ROAD.h - 104]; // the second string sits mid-road so it does not cover the badges of the stalls below
 const sag = x => 9 * Math.sin(((x - 110) % 145) / 145 * Math.PI);
 function drawStrings(t, kind) {
   const STAR = ["#ffd54f", "#ef5350", "#66bb6a", "#42a5f5", "#ab47bc"], BULB = ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"];
@@ -1137,8 +1137,8 @@ function stringLights(add, col) {
   for (const base of STRING_BASES()) for (let x = 134; x <= 1310; x += 96) add(x, base + sag(x) + 22, 70, col, .9);
 }
 function drawThemeOverlay(t) { const k = theme().strings; if (k) drawStrings(t, k); }
-// Trang trí riêng trên từng gian
-function tetDeco(s) { // câu đối đỏ hai bên gian
+// Decorations specific to each stall
+function tetDeco(s) { // red couplets on both sides of the stall
   for (const sx of [s.x - 16, s.x + s.w + 4]) { rect(sx, s.y + 56, 12, 74, "#c62828"); ctx.fillStyle = "#ffd54f"; for (let i = 0; i < 4; i++) ctx.fillRect(sx + 3, s.y + 64 + i * 16, 6, 3); }
 }
 function trungThuDeco(s, t) {
@@ -1148,15 +1148,15 @@ function trungThuDeco(s, t) {
   });
 }
 function noelDeco(s) {
-  ctx.fillStyle = "#fff"; for (let i = -6; i < s.w + 6; i += 14) { ctx.beginPath(); ctx.ellipse(s.x + i, s.y - 1, 9, 5, 0, 0, 7); ctx.fill(); } // tuyết đọng trên mái
+  ctx.fillStyle = "#fff"; for (let i = -6; i < s.w + 6; i += 14) { ctx.beginPath(); ctx.ellipse(s.x + i, s.y - 1, 9, 5, 0, 0, 7); ctx.fill(); } // snow resting on the roof
 }
 function noelTop(s) {
-  const cx = s.x + s.w / 2, by = s.y - 60; // mũ ông già Noel trên huy hiệu
+  const cx = s.x + s.w / 2, by = s.y - 60; // Santa hat on the badge
   ctx.fillStyle = OL; ctx.beginPath(); ctx.moveTo(cx - 22, by + 4); ctx.lineTo(cx + 16, by + 2); ctx.lineTo(cx + 28, by - 24); ctx.fill();
   ctx.fillStyle = "#e53935"; ctx.beginPath(); ctx.moveTo(cx - 19, by + 2); ctx.lineTo(cx + 13, by); ctx.lineTo(cx + 25, by - 21); ctx.fill();
   rect(cx - 23, by - 1, 40, 7, "#fff"); circ(cx + 26, by - 24, 5, "#fff");
 }
-function muaDeco(s, t) { // bạt che mưa và nước nhỏ giọt từ mái
+function muaDeco(s, t) { // rain tarp and water dripping from the roof
   ctx.fillStyle = "rgba(60,110,170,.6)"; ctx.fillRect(s.x - 12, s.y - 8, s.w + 24, 16);
   ctx.fillStyle = "rgba(255,255,255,.18)"; for (let i = 0; i < s.w + 24; i += 24) ctx.fillRect(s.x - 12 + i, s.y - 8, 12, 16);
   ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.strokeRect(s.x - 12, s.y - 8, s.w + 24, 16);
@@ -1164,19 +1164,19 @@ function muaDeco(s, t) { // bạt che mưa và nước nhỏ giọt từ mái
 }
 function themeStallTop(s) {
   theme().stallTop?.(s);
-  if (marketNightOn && !isClosed(s)) { // huy hiệu chợ đêm
+  if (marketNightOn && !isClosed(s)) { // night market badge
     const cx = s.x + s.w / 2; rect(cx + 30, s.y - 52, 74, 16, "#6a1b9a");
     ctx.fillStyle = "#ffe082"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("✨ CHỢ ĐÊM", cx + 67, s.y - 43);
   }
 }
-function drawShutter(s) { // khuya: gian đóng cửa, kéo cửa cuốn
+function drawShutter(s) { // late night: the stall is closed, roller shutter pulled down
   const top = s.y + 54, hh = s.h - 54;
   clipTo(s.x, top, s.w, hh, () => { ctx.fillStyle = "#6c747c"; ctx.fillRect(s.x, top, s.w, hh); ctx.fillStyle = "rgba(0,0,0,.18)"; for (let y = top + 6; y < top + hh; y += 8) ctx.fillRect(s.x, y, s.w, 2); });
   ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.strokeRect(s.x, top, s.w, hh);
   rect(s.x + s.w / 2 - 40, top + hh / 2 - 10, 80, 20, "#b71c1c");
   ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("ĐÓNG CỬA", s.x + s.w / 2, top + hh / 2 + 1);
 }
-function drawHat(c, hop) { // mũ ông già Noel trên đầu nhân vật
+function drawHat(c, hop) { // Santa hat on a character's head
   const hx = c.x, top = c.y - 46 - hop + 7, d = c.dir > 0 ? 1 : -1;
   ctx.fillStyle = OL; ctx.beginPath(); ctx.moveTo(hx - 14, top + 5); ctx.lineTo(hx + 14, top + 5); ctx.lineTo(hx + d * 16, top - 13); ctx.fill();
   ctx.fillStyle = "#e53935"; ctx.beginPath(); ctx.moveTo(hx - 12, top + 3); ctx.lineTo(hx + 12, top + 3); ctx.lineTo(hx + d * 14, top - 11); ctx.fill();
@@ -1189,7 +1189,7 @@ function adPool(k) {
   if (h >= 16 && h < 18) p.push(...EVENING_ADS, ...EVENING_ADS); else if (h >= 18 && h < 23) p.push(...NIGHT_ADS, ...NIGHT_ADS);
   return p;
 }
-// Bảng chọn cảnh chợ (ngày/đêm + theme)
+// Scene settings panel (day/night + theme)
 function openSettings() {
   view = null; $("mtitle").textContent = "Cảnh chợ"; $("mhead").style.background = "#37474f";
   $("grid").style.cssText = "grid-template-columns:1fr"; renderSettings(); showModal();
@@ -1223,7 +1223,7 @@ $("grid").addEventListener("click", e => {
 });
 $("sceneBtn").onclick = openSettings;
 
-// ===== Âm thanh: tổng hợp bằng Web Audio, không cần file âm thanh =====
+// ===== Sound: synthesized with Web Audio, no audio files needed =====
 const AUD_KEY = "cho.audio";
 const aud = (() => {
   const d = { on: true, music: true, sfx: true, amb: true, vol: .7 };
@@ -1235,7 +1235,7 @@ const A = { ctx: null, master: null, music: null, sfx: null, amb: null, noise: n
 
 function buildAudio(ctx) {
   A.ctx = ctx;
-  // Bộ chặn đỉnh mềm (tanh): âm nhỏ giữ nguyên, chỉ bo tròn khi âm quá to để không bị vỡ tiếng
+  // Soft peak limiter (tanh): quiet sounds pass unchanged, only loud peaks are rounded off so nothing clips
   const comp = ctx.createWaveShaper(), curve = new Float32Array(1024);
   for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * 1.5) / 1.5; }
   comp.curve = curve; comp.connect(ctx.destination);
@@ -1246,7 +1246,7 @@ function buildAudio(ctx) {
   for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   A.noise = buf;
   applyAudio(true);
-  // Vòng tiếng ồn có lọc (mưa, gió, tiếng chợ). Mỗi vòng có một nấc gain riêng do updateAudio điều khiển.
+  // Filtered noise loops (rain, wind, market chatter). Each loop has its own gain stage controlled by updateAudio.
   const loop = (type, freq, q, rate = 0, depth = 0) => {
     const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
     const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
@@ -1258,7 +1258,7 @@ function buildAudio(ctx) {
   A.rain = loop("bandpass", 3200, .5);
   A.wind = loop("lowpass", 450, .7, .13, .5);
   A.murmur = loop("bandpass", 380, .9, .21, .3);
-  // Dế kêu ban đêm: sóng mang cao tần được điều biên theo nhịp
+  // Night crickets: a high-frequency carrier amplitude-modulated at a steady rhythm
   const car = ctx.createOscillator(); car.frequency.value = 4300;
   const am = ctx.createGain(); am.gain.value = .5; A.cricket = ctx.createGain(); A.cricket.gain.value = 0;
   const lf = ctx.createOscillator(); lf.type = "square"; lf.frequency.value = 5.3; const ld = ctx.createGain(); ld.gain.value = .5;
@@ -1274,11 +1274,11 @@ function applyAudio(snap) {
   A.amb.gain.setTargetAtTime(aud.amb ? 1 : 0, t, .3);
   if (snap) return;
   if (aud.on) { if (A.ctx.state !== "running" && !document.hidden) A.ctx.resume?.(); silentPlay(true); }
-  else { silentPlay(false); setTimeout(() => { if (!aud.on && A.ctx.state === "running") A.ctx.suspend?.(); }, 400); } // tắt hẳn thì ngừng xử lý âm thanh cho đỡ tốn pin
+  else { silentPlay(false); setTimeout(() => { if (!aud.on && A.ctx.state === "running") A.ctx.suspend?.(); }, 400); } // when fully off, stop audio processing to save battery
 }
 function updateSoundBtn() { const b = $("soundBtn"); if (b) { b.textContent = aud.on ? "🔊" : "🔇"; b.setAttribute("aria-pressed", aud.on); } }
-// --- iPhone/iPad: công tắc rung/im lặng bên hông máy mặc định tắt tiếng Web Audio.
-// Đưa phiên âm thanh sang kiểu "playback" (như video/nhạc) và giữ một đoạn audio im lặng đang phát thì tiếng mới ra.
+// --- iPhone/iPad: the side ring/silent switch mutes Web Audio by default.
+// Switch the audio session to "playback" (like video/music) and keep a silent audio clip playing so sound comes out.
 const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 function silentWavUri() {
   const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer), w = (o, t) => [...t].forEach((c, i) => b[o + i] = c.charCodeAt(0));
@@ -1294,7 +1294,7 @@ function silentPlay(on) {
     if (on) A.silent.play?.().catch(() => {}); else A.silent.pause();
   } catch {}
 }
-function updateAudioHint() { // nhắc người chơi chạm màn hình nếu trình duyệt đang chặn âm thanh
+function updateAudioHint() { // remind the player to tap the screen if the browser is blocking audio
   const h = $("audioHint"); if (h) h.hidden = !(aud.on && (!A.ctx || A.ctx.state !== "running"));
 }
 function audioInit() {
@@ -1305,11 +1305,11 @@ function audioInit() {
   if (aud.on && A.ctx.state !== "running" && !document.hidden) A.ctx.resume?.().then?.(updateAudioHint, () => {});
   updateAudioHint();
 }
-// Mở khoá âm thanh: iOS chỉ chấp nhận trong lúc chạm xong (touchend/click), nên nghe cả các sự kiện này
+// Unlock audio: iOS only accepts it right as a touch ends (touchend/click), so listen to these events too
 function audioUnlock() {
   audioInit(); if (!A.ctx) return;
   if (aud.on) silentPlay(true);
-  if (!A.unlocked && A.ctx.state === "running") { // phát một mẫu im lặng để iOS xác nhận
+  if (!A.unlocked && A.ctx.state === "running") { // play a silent sample so iOS confirms the unlock
     try { const s = A.ctx.createBufferSource(); s.buffer = A.ctx.createBuffer(1, 1, 22050); s.connect(A.ctx.destination); s.start(0); A.unlocked = true; } catch {}
   }
 }
@@ -1321,7 +1321,7 @@ document.addEventListener("visibilitychange", () => {
 });
 updateAudioHint();
 
-// --- Giọng nói cơ bản: một nốt (tone) và một đợt tiếng ồn (noise) có bao biên độ
+// --- Basic voices: a tone (note) and a burst of noise (noise), each with an amplitude envelope
 function tone(f, t0, dur, o = {}) {
   const c = A.ctx, osc = c.createOscillator(), g = c.createGain();
   osc.type = o.type || "sine"; osc.frequency.setValueAtTime(f, t0);
@@ -1335,7 +1335,7 @@ function noise(t0, dur, o = {}) {
   g.gain.setValueAtTime(.0001, t0); g.gain.linearRampToValueAtTime(o.gain ?? .1, t0 + (o.attack ?? .005)); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
   s.connect(f); f.connect(g); g.connect(o.bus || A.sfx); s.start(t0, Math.random() * 1.5); s.stop(t0 + dur + .05);
 }
-// --- Hiệu ứng
+// --- Sound effects
 const SFX = {
   step: t => { noise(t, .06, { freq: 420 + Math.random() * 260, q: .9, gain: .13 }); tone(90 + Math.random() * 20, t, .05, { gain: .05 }); },
   tick: t => tone(1250, t, .035, { type: "triangle", gain: .06 }),
@@ -1349,11 +1349,11 @@ const SFX = {
   talk: (t, idx, vol) => { const base = 260 + idx * 38, n = 3 + (Math.random() * 3 | 0); for (let i = 0; i < n; i++) tone(base * [1, 1.26, 1.5, 1.19, 1.68][Math.random() * 5 | 0], t + i * .06, .07, { type: "triangle", gain: .07 * vol }); },
 };
 function sfx(name, ...args) { if (!A.ctx || !aud.on || !aud.sfx || A.ctx.state === "closed") return; try { SFX[name](A.ctx.currentTime, ...args); } catch {} }
-function chirp() { // chim hót ban ngày
+function chirp() { // birdsong in the daytime
   const t = A.ctx.currentTime, f = 2600 + Math.random() * 1800, n = 2 + (Math.random() * 3 | 0);
   for (let i = 0; i < n; i++) tone(f * (1 + i * .08), t + i * .11, .08, { gain: .035, to: f * (1.3 + Math.random() * .3), bus: A.amb });
 }
-// --- Mỗi khung hình: bước chân và độ lớn các tiếng môi trường theo giờ và theme
+// --- Every frame: footsteps, and the level of the ambient sounds by hour and theme
 function updateAudio(dt) {
   const st = Math.floor(player.walk);
   if (player.moving && !modalOpen() && st !== A.lastStep && st % 2 === 1) sfx("step");
@@ -1367,7 +1367,7 @@ function updateAudio(dt) {
   const t = performance.now() / 1000;
   if (!rain && lit < .3 && aud.on && aud.amb && A.ctx.state === "running" && t > A.nextBird) { chirp(); A.nextBird = t + 2 + Math.random() * 5; }
 }
-// --- Nhạc nền tự sinh: hợp âm nền + bass + giai điệu ngũ cung, mỗi theme một giọng riêng
+// --- Generative background music: chord pad + bass + pentatonic melody, each theme with its own voice
 const SCALE = { major: [0, 2, 4, 7, 9], minor: [0, 3, 5, 7, 10] };
 const MUSIC = {
   default: { root: 60, sc: "major", bpm: 92, wave: "triangle", p: .55, bell: false, prog: [0, 3, 1, 4] },
@@ -1396,7 +1396,7 @@ function musicTick(force = false, ahead = .5) {
     A.mNext += step; A.mStep++;
   }
 }
-// Nút bật/tắt âm thanh và tiếng bấm trong các bảng
+// Sound on/off button and click sounds in the panels
 $("soundBtn").onclick = () => { audioUnlock(); aud.on = !aud.on; saveAudio(); applyAudio(); if (aud.on) sfx("tick"); };
 $("modal").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b || b.id === "mclose" || b.dataset.cz === "done" || b.dataset.sc === "done") return;
@@ -1412,9 +1412,9 @@ $("grid").addEventListener("input", e => {
 $("grid").addEventListener("change", e => { if (e.target.id === "vol") sfx("tick"); });
 updateSoundBtn();
 
-// ===== Nhiều người chơi: broker MQTT công cộng làm bộ chuyển tiếp (không cần server riêng) =====
-// Mỗi người gửi vị trí và ngoại hình của mình lên topic riêng, đồng thời nghe tất cả topic người khác.
-// Muốn tách nhóm riêng thì mở link kèm ?room=ten-nhom
+// ===== Multiplayer: a public MQTT broker acts as the relay (no server of our own) =====
+// Each player publishes their position and look on their own topic and listens to everyone else's topics.
+// To separate a group, open the link with ?room=group-name
 const NETKEY = "cho.net";
 const netCfg = (() => { const d = { on: true }; try { const p = JSON.parse(localStorage.getItem(NETKEY)); if (p && typeof p.on === "boolean") d.on = p.on; } catch {} return d; })();
 const saveNet = () => { try { localStorage.setItem(NETKEY, JSON.stringify(netCfg)); } catch {} };
@@ -1455,7 +1455,7 @@ function netStart() {
   const down = () => {
     if (NET.client !== c) return;
     setNetState(everConnected ? "connecting" : "offline");
-    if (!everConnected && ++NET.fails >= 2) { NET.fails = 0; NET.bi++; c.end(true); NET.client = null; setTimeout(netStart, 500); } // broker này không vào được: thử broker kế
+    if (!everConnected && ++NET.fails >= 2) { NET.fails = 0; NET.bi++; c.end(true); NET.client = null; setTimeout(netStart, 500); } // this broker is unreachable: try the next one
   };
   c.on("close", down); c.on("error", () => {});
 }
@@ -1467,7 +1467,7 @@ function netStop() {
 addEventListener("pagehide", () => { const c = NET.client; if (c && NET.state === "ok") try { c.publish(`${NET_BASE()}/p/${NET.id}`, JSON.stringify({ bye: 1 })); } catch {} });
 addEventListener("load", netStart);
 
-// Nhận tin: luôn kiểm tra dữ liệu vì ai cũng gửi được lên broker công cộng
+// Incoming messages: always validate the data, since anyone can publish to a public broker
 const cleanText = (t, n) => String(t ?? "").replace(/[\u0000-\u001f\u007f<>]/g, "").trim().slice(0, n);
 function netMessage(topic, m) {
   if (!m || typeof m !== "object") return;
@@ -1506,7 +1506,7 @@ function sendChat(text) {
   NET.chatAt = now; player.bubble = { text, from: now / 1000, until: now / 1000 + 5 };
   netSend(`${NET_BASE()}/chat`, { i: NET.id, t: text }); return true;
 }
-// Mỗi khung hình: làm mượt người khác, bỏ người im quá lâu, gửi trạng thái của mình (tối đa 10 lần/giây khi di chuyển, 1 lần/giây khi đứng)
+// Every frame: smooth other players, drop anyone silent too long, publish our own state (up to 10 times/second while moving, once/second when idle)
 function updateNet(dt) {
   const now = performance.now();
   for (const [id, r] of remotes) {
@@ -1533,7 +1533,7 @@ function updateNetBtn(force) {
 }
 const netStatusText = () => NET.state === "ok" ? `${remotes.size + 1} người · phòng ${NET.room}` : NET.state === "off" ? "Đang tắt" : NET.state === "connecting" ? "Đang kết nối…" : "Không kết nối được";
 
-// --- Khung nhắn tin
+// --- Chat box
 function openChat() {
   if (modalOpen()) return;
   $("chatBar").hidden = false; $("chatIn").focus();
@@ -1545,30 +1545,30 @@ $("chatBar").addEventListener("submit", e => { e.preventDefault(); const i = $("
 $("chatBar").addEventListener("keydown", e => { if (e.key === "Escape") closeChat(); });
 updateNetBtn(true);
 
-// ===== Gian hàng: mỗi tiệm một kiểu mái, tường, biển hiệu và đồ trưng bày riêng =====
-const OL = "#2b1d16"; // viền tối kiểu pixel art, khớp với tile Tiny Town
+// ===== Stalls: each shop has its own roof, wall, sign and display =====
+const OL = "#2b1d16"; // dark pixel-art outline, matching the Tiny Town tiles
 function rect(x, y, w, h, fill, ol = OL) { ctx.fillStyle = ol; ctx.fillRect(x - 2, y - 2, w + 4, h + 4); ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); }
 function circ(x, y, r, fill, ol = OL) { ctx.fillStyle = ol; ctx.beginPath(); ctx.arc(x, y, r + 2, 0, 7); ctx.fill(); ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
 function emoji(e, x, y, size) { ctx.fillStyle = "#000"; ctx.font = `${size}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(e, x, y); }
 const tileSized = (c, r, x, y, size) => ctx.drawImage(TOWN, c * 16, r * 16, 16, 16, x, y, size, size);
 function clipTo(x, y, w, h, fn) { ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); fn(); ctx.restore(); }
 
-// --- Mái
+// --- Roofs
 function roofAwning(x, y, w, h, c1, c2) {
   const n = 10, sw = (w + 16) / n, x0 = x - 8;
   ctx.fillStyle = OL; ctx.fillRect(x0 - 2, y - 2, w + 20, h + 4);
   for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? c2 : c1; ctx.fillRect(x0 + i * sw, y, sw + 1, h); }
-  for (let i = 0; i < n; i++) { // mép rủ hình vỏ sò
+  for (let i = 0; i < n; i++) { // scalloped hanging edge
     ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(x0 + (i + .5) * sw, y + h, sw / 2 + 2, 0, Math.PI); ctx.fill();
     ctx.fillStyle = i % 2 ? c2 : c1; ctx.beginPath(); ctx.arc(x0 + (i + .5) * sw, y + h, sw / 2, 0, Math.PI); ctx.fill();
   }
 }
-function roofTiles(x, y, w, h, col) { // mái ngói lấy từ Tiny Town: cột 1 = ngói xám xanh, cột 5 = ngói đỏ
+function roofTiles(x, y, w, h, col) { // tile roof taken from Tiny Town: column 1 = blue-grey tiles, column 5 = red tiles
   const sz = h / 2;
   clipTo(x - 10, y, w + 20, h, () => { for (let tx = x - 10; tx < x + w + 10; tx += sz) { tileSized(col, 4, tx, y, sz); tileSized(col, 5, tx, y + sz, sz); } });
   ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.strokeRect(x - 10, y, w + 20, h);
 }
-function roofThatch(x, y, w, h) { // mái rơm
+function roofThatch(x, y, w, h) { // thatched roof
   const poly = (d, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(x - 16 + d, y + h - d); ctx.lineTo(x + 14 + d, y + d - 4);
     ctx.lineTo(x + w - 14 - d, y + d - 4); ctx.lineTo(x + w + 16 - d, y + h - d); ctx.fill(); };
   poly(0, OL); poly(3, "#d9ae4f");
@@ -1577,7 +1577,7 @@ function roofThatch(x, y, w, h) { // mái rơm
   ctx.fillStyle = "#d9ae4f";
   for (let i = -12; i < w + 12; i += 8) { ctx.beginPath(); ctx.moveTo(x + i, y + h - 4); ctx.lineTo(x + i + 4, y + h + 7); ctx.lineTo(x + i + 8, y + h - 4); ctx.fill(); }
 }
-// --- Tường
+// --- Walls
 function wall(x, y, w, h, kind, color, accent) {
   clipTo(x, y, w, h, () => {
     if (kind === "wood") { for (let ty = y; ty < y + h; ty += T) for (let tx = x; tx < x + w; tx += T) tile(1, 6, tx, ty); }
@@ -1590,7 +1590,7 @@ function wall(x, y, w, h, kind, color, accent) {
   });
   ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
 }
-// --- Biển hiệu nổi trên nóc: huy hiệu tròn có icon lớn + bảng tên
+// --- Sign floating above the roof: a round badge with a large icon + a name board
 function signboard(s, cx, y) {
   const bw = 156, bh = 30;
   rect(cx - 60, y + bh - 4, 6, 12, "#6d4c41"); rect(cx + 54, y + bh - 4, 6, 12, "#6d4c41");
@@ -1602,8 +1602,8 @@ function signboard(s, cx, y) {
   emoji(s.icon, cx, y - 20, 26);
 }
 
-// --- Đồ trưng bày từng loại. F = dải quầy phía trước (phía đường), B = phần tường phía sau
-function tee(x, y, c, sway) { // áo thun treo móc
+// --- Displays per stall type. F = the front counter strip (road side), B = the back wall area
+function tee(x, y, c, sway) { // T-shirt on a hanger
   ctx.save(); ctx.translate(x, y); ctx.rotate(sway);
   ctx.strokeStyle = "#ccc"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(0, -2); ctx.moveTo(-8, 2); ctx.lineTo(0, -3); ctx.lineTo(8, 2); ctx.stroke();
   ctx.fillStyle = OL; ctx.fillRect(-12, 0, 24, 9); ctx.fillRect(-8, 0, 16, 22);
@@ -1737,16 +1737,16 @@ function drawStall(s, t) {
   if (st.lanterns) { lantern(x + 14, y + ROOF_H, t, 0); lantern(x + w - 14, y + ROOF_H, t, 1.7); }
   if (s.kind === "food") { const sy = top ? y + h + 8 : y - 22; stool(x + w + 8, sy, "#e53935"); stool(x + w + 28, sy + 6, "#1e88e5"); }
   if (isClosed(s)) drawShutter(s);
-  theme().stallDeco?.(s, t);      // trang trí mái/hai bên: vẽ trước để bảng tên nằm trên
+  theme().stallDeco?.(s, t);      // roof/side decorations: drawn first so the name board sits on top
   signboard(s, x + w / 2, y - 18);
-  themeStallTop(s);               // mũ Noel, huy hiệu chợ đêm: vẽ sau cùng
+  themeStallTop(s);               // Santa hat, night-market badge: drawn last
   if (s === nearStall) {
     ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
     ctx.strokeRect(s.zone.x, s.zone.y, s.zone.w, s.zone.h); ctx.setLineDash([]);
   }
 }
 function drawTree([x, y], i) {
-  const col = i % 3 === 2 ? 3 : 4; // xen kẽ cây xanh và cây vàng
+  const col = i % 3 === 2 ? 3 : 4; // alternate green and yellow trees
   ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(x, y + 10, 22, 7, 0, 0, 7); ctx.fill();
   tile(col, 0, x - T / 2, y + 12 - 2 * T); tile(col, 1, x - T / 2, y + 12 - T);
 }
@@ -1765,7 +1765,7 @@ function drawChar(c, isPlayer) {
   ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.strokeText(label, c.x, ny);
   ctx.fillStyle = isPlayer ? NAME_COLORS[profile.color] : c.nameColor ?? (c.keeper ? "#ffcc80" : "#fff"); ctx.fillText(label, c.x, ny);
 }
-// Bong bóng thoại: chữ tự xuống dòng, hiện dần rồi mờ dần
+// Speech bubble: text wraps by itself, fades in, then fades out
 function drawBubble(k, t) {
   const b = k.bubble; if (!b) return;
   const a = Math.min(1, (t - b.from) * 5, (b.until - t) * 3);
@@ -1785,7 +1785,7 @@ function drawBubble(k, t) {
 function draw() {
   ctx.setTransform(devicePixelRatio * VIEW, 0, 0, devicePixelRatio * VIEW, 0, 0);
   ctx.fillStyle = "#2b2b2b"; ctx.fillRect(0, 0, cam.w, cam.h);
-  const px = devicePixelRatio * VIEW; // làm tròn theo điểm ảnh thật của màn hình: camera trôi mượt mà pixel art vẫn sắc nét
+  const px = devicePixelRatio * VIEW; // round to the screen's real pixels: the camera drifts smoothly while pixel art stays sharp
   ctx.translate(-Math.round(cam.x * px) / px, -Math.round(cam.y * px) / px);
   ctx.imageSmoothingEnabled = false;
   const t = performance.now() / 1000;
@@ -1794,7 +1794,7 @@ function draw() {
   drawGate();
   if (player.target) { ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(player.target.x, player.target.y, 10, 5, 0, 0, 7); ctx.stroke(); }
   STALLS.forEach(s => drawStall(s, t));
-  // sắp xếp theo y để nhân vật/cây che nhau đúng chiều sâu
+  // sort by y so characters and trees overlap correctly in depth
   [...TREES.map((t, i) => ({ y: t[1], f: () => drawTree(t, i) })),
    ...themeDecorItems(t),
    ...npcs.filter(n => !n.hidden).map(n => ({ y: n.y, f: () => drawChar(n, false) })),
@@ -1803,19 +1803,19 @@ function draw() {
    ...(PETS[profile.pet] ? [{ y: pet.y, f: drawPet }] : []),
    { y: player.y, f: () => drawChar(player, true) }]
     .sort((a, b) => a.y - b.y).forEach(o => o.f());
-  drawThemeOverlay(t);   // dây đèn giăng trên đường
-  drawLighting(t);       // đêm/chiều: phủ màu và khoét ánh sáng
+  drawThemeOverlay(t);   // string lights across the road
+  drawLighting(t);       // night/dusk: tint the scene and punch out the light
   drawFireflies(t);
-  keepers.forEach(k => drawBubble(k, t)); // bong bóng luôn nằm trên cùng
+  keepers.forEach(k => drawBubble(k, t)); // speech bubbles always go on top
   remotes.forEach(r => drawBubble(r, t)); if (player.bubble) drawBubble(player, t);
   ctx.setTransform(devicePixelRatio * VIEW, 0, 0, devicePixelRatio * VIEW, 0, 0);
-  drawParticles(t);      // hoa rơi, tuyết, mưa, tia chớp (toạ độ màn hình)
-  if (modalOpen()) drawStage(t);          // sân xem trước trong bảng nhân vật (nếu đang mở)
+  drawParticles(t);      // falling petals, snow, rain, lightning (screen coordinates)
+  if (modalOpen()) drawStage(t);          // preview lawn in the character panel (if it is open)
 }
 
-let VIEW = 1; // hệ số thu phóng khung nhìn
+let VIEW = 1; // viewport zoom factor
 function resize() {
-  VIEW = Math.min(innerWidth, innerHeight) < 500 ? 0.8 : 1; // điện thoại: lùi camera ra một chút
+  VIEW = Math.min(innerWidth, innerHeight) < 500 ? 0.8 : 1; // phones: pull the camera back a little
   cam.w = innerWidth / VIEW; cam.h = innerHeight / VIEW;
   canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio;
   canvas.style.width = innerWidth + "px"; canvas.style.height = innerHeight + "px";
@@ -1829,7 +1829,7 @@ Promise.all([loadImg(TOWN_PNG), loadImg(CHARS_PNG)]).then(([town, chars]) => {
   updateCamera(1, true);
   let last = performance.now();
   (function loop(now = performance.now()) {
-    const dt = Math.min((now - last) / (1000 / 60), 3); // quy về khung 60fps; chặn lại khi tab vừa quay lại
+    const dt = Math.min((now - last) / (1000 / 60), 3); // convert to 60fps frames; clamp when the tab has just come back
     last = now;
     update(dt); draw(); requestAnimationFrame(loop);
   })();
