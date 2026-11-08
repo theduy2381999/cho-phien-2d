@@ -1016,7 +1016,7 @@ function collectLights(t) {
   return L;
 }
 function drawLighting(t) {
-  if (amb.a < 0.012) return;
+  if (amb.a < 0.012 || !lightCv.width || !lightCv.height) return; // nothing to draw, or the viewport has zero size
   const g = lightG, w = lightCv.width, h = lightCv.height;
   g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, w, h);
   g.fillStyle = `rgba(${amb.r | 0},${amb.g | 0},${amb.b | 0},${amb.a})`; g.fillRect(0, 0, w, h);
@@ -1831,7 +1831,8 @@ Promise.all([loadImg(TOWN_PNG), loadImg(CHARS_PNG)]).then(([town, chars]) => {
   (function loop(now = performance.now()) {
     const dt = Math.min((now - last) / (1000 / 60), 3); // convert to 60fps frames; clamp when the tab has just come back
     last = now;
-    update(dt); draw(); requestAnimationFrame(loop);
+    requestAnimationFrame(loop); // schedule first so one bad frame cannot stop the game loop
+    update(dt); draw();
   })();
 });
 </script>
