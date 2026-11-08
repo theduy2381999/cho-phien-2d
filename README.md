@@ -2,7 +2,7 @@
 
 A 2D browser game: you control a character strolling between the 8 stalls of a Vietnamese country market, browse products, chat, and meet other players.
 
-**Play it:** https://cho-phien-2d.netlify.app
+**Play it:** https://chophien.netlify.app
 
 > The in-game text (stall names, shopkeeper lines, buttons) is in Vietnamese, because the players are Vietnamese. Code comments and documentation are in English.
 
@@ -44,7 +44,7 @@ python3 -m http.server 8080
 The game uses a **public MQTT broker** as a relay, so no server of our own is needed. Open the link with `?room=group-name` to play privately with a group:
 
 ```
-https://cho-phien-2d.netlify.app/?room=team-a
+https://chophien.netlify.app/?room=team-a
 ```
 
 Anyone who opens the same room name sees each other. Without `?room=`, everyone joins the default room `main`.
@@ -53,19 +53,24 @@ Anyone who opens the same room name sees each other. Without `?room=`, everyone 
 
 ## Deploy
 
-The site is hosted on Netlify (`cho-phien-2d`). With the Netlify CLI logged in:
+The site is hosted on Netlify (`chophien`) and **deploys automatically on every push to `main`**. Netlify clones the repo with a read-only deploy key, runs the build command from `netlify.toml` and publishes `dist/`. Progress is visible at https://app.netlify.com/projects/chophien/deploys.
+
+The connection is a deploy key plus a GitHub webhook that calls a Netlify build hook. The webhook fires on a push to any branch, but the build hook always builds `main`.
+
+To deploy by hand without pushing (needs the Netlify CLI, logged in):
 
 ```bash
 ./deploy.sh "note for this deploy"
 ```
 
-The script copies `index.html` into `dist/` and pushes it to production. Pushing to GitHub does not deploy by itself.
+The script copies `index.html` into `dist/` and pushes it to production.
 
 ## Project layout
 
 ```
 index.html     the whole game (HTML, CSS, JS, assets embedded as base64)
-deploy.sh      deploy to Netlify
+deploy.sh      manual deploy to Netlify (normally a push to main does this)
+netlify.toml   Netlify build settings
 assets/        original Kenney assets (unpacked, kept as the source)
 ```
 

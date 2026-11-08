@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Deploy the game to Netlify: https://cho-phien-2d.netlify.app
+# Deploy the game to Netlify: https://chophien.netlify.app
 # Usage: ./deploy.sh "note for this deploy"
 set -euo pipefail
 cd "$(dirname "$0")"
 
-SITE_ID="ae85e4d6-0f16-497c-9878-4a1ce51a983d"   # the cho-phien-2d site
+SITE_ID="d51d9126-9fa0-4806-b769-648a8016712f"   # the chophien site
 mkdir -p dist
 cp index.html dist/index.html
 

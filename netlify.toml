@@ -1,0 +1,5 @@
+# Netlify build settings, used when a push to GitHub triggers a deploy.
+# Only dist/ is published, so README.md, deploy.sh and assets/ are not served.
+[build]
+  command = "mkdir -p dist && cp index.html dist/index.html"
+  publish = "dist"
