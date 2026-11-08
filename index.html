@@ -1,0 +1,1839 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Chợ Phiên 2D</title>
+<script async src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #2b2b2b; overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  canvas { display: block; touch-action: none; }
+  #hud { position: fixed; top: 12px; left: 12px; color: #fff; background: rgba(0,0,0,.55);
+    padding: 8px 12px; border-radius: 8px; font-size: 13px; line-height: 1.5; pointer-events: none; }
+  #hint { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: #fff8e1; color: #5d4037; padding: 10px 16px; border-radius: 999px;
+    font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.3); display: none; cursor: pointer; }
+  #modal { position: fixed; inset: 0; background: rgba(0,0,0,0); display: none;
+    align-items: center; justify-content: center; padding: 16px; transition: background .2s ease; }
+  #modal .box { background: #fffdf7; border-radius: 14px; width: min(520px, 100%);
+    max-height: 85vh; overflow: auto; box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    opacity: 0; transform: translateY(16px) scale(.94);
+    transition: opacity .16s ease, transform .24s cubic-bezier(.2, 1.25, .4, 1); }
+  #modal.open { background: rgba(0,0,0,.5); }
+  #modal.open .box { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { #modal, #modal .box { transition: none; } }
+  #modal header { display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; color: #fff; border-radius: 14px 14px 0 0; }
+  #modal header h2 { margin: 0; font-size: 18px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #modal header { gap: 12px; }
+  #modal header button { background: rgba(255,255,255,.25); border: 0; color: #fff;
+    font-size: 18px; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px; padding: 16px; }
+  .item { border: 1px solid #eee3c8; border-radius: 10px; padding: 12px; text-align: center; background: #fff; }
+  .item .emo { font-size: 40px; }
+  .item .name { font-weight: 600; margin: 6px 0 2px; color: #333; }
+  .item .price { color: #d84315; font-weight: 700; }
+  #sceneBtn { position: fixed; top: 56px; right: 12px; background: #fff8e1; color: #5d4037; border: 0; padding: 8px 12px;
+    border-radius: 8px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3); font-variant-numeric: tabular-nums; }
+  #sceneBtn .ic { font-size: 18px; line-height: 1; }
+  #soundBtn { position: fixed; top: 100px; right: 12px; background: #fff8e1; border: 0; padding: 8px 12px; border-radius: 8px;
+    font-size: 18px; line-height: 1.2; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  #soundBtn:focus-visible { outline: 3px solid #1e88e5; outline-offset: 2px; }
+  #vol { width: 100%; accent-color: #ffb300; }
+  #netBtn { position: fixed; top: 144px; right: 12px; background: #fff8e1; color: #5d4037; border: 0; padding: 8px 12px; border-radius: 8px;
+    font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.3); font-variant-numeric: tabular-nums; }
+  #netBtn .dot { width: 8px; height: 8px; border-radius: 50%; background: #bdbdbd; }
+  #netBtn.online .dot { background: #43a047; box-shadow: 0 0 0 3px rgba(67,160,71,.25); }
+  #netBtn:focus-visible { outline: 3px solid #1e88e5; outline-offset: 2px; }
+  #chatBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 6;
+    display: flex; gap: 8px; width: min(420px, calc(100vw - 24px)); }
+  #chatBar[hidden] { display: none; }
+  #chatBar input { flex: 1; min-width: 0; font: inherit; font-weight: 600; padding: 11px 14px; border-radius: 999px; border: 3px solid #5d4037; background: #fff8e1; color: #3e2723; }
+  #chatBar input:focus { outline: 3px solid #ffb300; outline-offset: 1px; }
+  #chatBar button { font: inherit; font-weight: 800; padding: 0 18px; border-radius: 999px; border: 3px solid #5d4037; background: #ffb300; color: #3e2723; cursor: pointer; }
+  #audioHint { position: fixed; left: 50%; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 5;
+    background: rgba(43,29,22,.88); color: #fff8e1; padding: 8px 14px; border-radius: 999px; font-size: 13px; font-weight: 700;
+    pointer-events: none; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+  #sceneBtn:focus-visible, #avaBtn:focus-visible { outline: 3px solid #1e88e5; outline-offset: 2px; }
+  .cz-opt small { font-weight: 600; color: #a1887f; font-size: 11px; line-height: 1.25; }
+  body[data-theme="tet"] #modal .box { box-shadow: 0 0 0 4px #c62828, 0 0 0 7px #ffd54f, 0 10px 30px rgba(0,0,0,.4); }
+  body[data-theme="trungthu"] #modal .box { box-shadow: 0 0 0 4px #ef6c00, 0 0 0 7px #fff176, 0 10px 30px rgba(0,0,0,.4); }
+  body[data-theme="noel"] #modal .box { box-shadow: 0 0 0 4px #2e7d32, 0 0 0 7px #fff, 0 10px 30px rgba(0,0,0,.4); }
+  body[data-theme="mua"] #modal .box { box-shadow: 0 0 0 4px #546e7a, 0 0 0 7px #b0bec5, 0 10px 30px rgba(0,0,0,.4); }
+  body.night #modal .box { filter: brightness(.92) saturate(.95); }
+  /* ----- Bảng nhân vật ----- */
+  .cz { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 16px; align-items: start; }
+  .cz-stage { position: sticky; top: 0; display: grid; justify-items: center; gap: 12px; padding: 14px 10px;
+    background: #fff3e0; border: 2px solid #ecd9bb; border-radius: 16px; }
+  .cz-scene { position: relative; }
+  #pv { display: block; width: 172px; height: 172px; image-rendering: pixelated; border-radius: 14px;
+    border: 3px solid #5d4037; box-shadow: 0 4px 0 #5d4037; background: #7cb35b; }
+  .cz-tag { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); max-width: 156px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; background: rgba(43,29,22,.72); padding: 2px 10px; border-radius: 999px;
+    font-weight: 800; font-size: 13px; }
+  .cz-petpv { position: absolute; right: 26px; bottom: 30px; font-size: 26px; animation: czhop .7s ease-in-out infinite; }
+  @keyframes czhop { 50% { transform: translateY(-6px); } }
+  .cz-hint { font-size: 12px; color: #8d6e63; text-align: center; }
+  .cz-btn2 { border: 2px solid #5d4037; background: #fff; color: #5d4037; border-radius: 12px; padding: 8px 16px;
+    font: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 3px 0 #5d4037; }
+  .cz-btn2:active { transform: translateY(3px); box-shadow: none; }
+  .cz-panel { display: grid; gap: 16px; min-width: 0; }
+  .cz-tabs { display: flex; gap: 4px; padding: 4px; background: #f1e6d6; border-radius: 12px; }
+  .cz-tabs button { flex: 1; border: 0; background: none; padding: 9px 6px; border-radius: 9px; font: inherit;
+    font-weight: 800; color: #8d6e63; cursor: pointer; }
+  .cz-tabs button.on { background: #fff; color: #3e2723; box-shadow: 0 2px 6px rgba(62,39,35,.15); }
+  .cz-field { display: grid; gap: 8px; }
+  .cz-lb { display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #5d4037; }
+  .cz-lb em { font-style: normal; font-weight: 600; color: #bcaaa4; font-variant-numeric: tabular-nums; }
+  .cz-input { display: flex; align-items: center; gap: 8px; padding: 0 12px; background: #fff; border: 2px solid #ecd9bb; border-radius: 12px; }
+  .cz-input:focus-within { border-color: #ffb300; box-shadow: 0 0 0 3px #ffe08299; }
+  .cz-input input { flex: 1; min-width: 0; border: 0; outline: 0; padding: 11px 0; background: transparent;
+    font: inherit; font-weight: 700; color: #3e2723; }
+  .cz-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cz-sw { position: relative; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 2px solid rgba(62,39,35,.3); cursor: pointer; }
+  .cz-sw.on { box-shadow: 0 0 0 3px #fffdf7, 0 0 0 5px #ffb300; }
+  .cz-sw.on::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; color: #3e2723; text-shadow: 0 0 3px #fff; }
+  .cz-opts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(var(--min, 46px), 1fr)); }
+  .cz-opt { display: grid; place-items: center; gap: 2px; padding: 6px 4px; background: #fff; border: 2px solid #eadbc4; border-radius: 12px;
+    font: inherit; font-size: 12px; font-weight: 700; color: #5d4037; cursor: pointer; transition: transform .1s, border-color .1s; }
+  .cz-opt:hover { transform: translateY(-2px); border-color: #d7b98e; }
+  .cz-opt.on { border-color: #ffb300; background: #fff8e1; box-shadow: 0 3px 0 #ffb300; }
+  .cz-opt .ic { font-size: 24px; line-height: 1.15; }
+  .cz-opt canvas { width: 100%; aspect-ratio: 1; image-rendering: pixelated; }
+  .cz-opt .none { font-size: 22px; opacity: .5; }
+  .cz-cats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .cz-cat { border: 0; background: #f1e6d6; color: #8d6e63; padding: 7px 2px; font-size: 13px; white-space: nowrap; border-radius: 999px; font: inherit; font-weight: 800; cursor: pointer; }
+  .cz-cat.on { background: #5d4037; color: #fff; }
+  .cz-done { grid-column: 1 / -1; padding: 13px; border: 2px solid #5d4037; border-radius: 14px; background: #ffb300; color: #3e2723;
+    font: inherit; font-size: 16px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 0 #5d4037; }
+  .cz-done:active { transform: translateY(4px); box-shadow: none; }
+  .cz button:focus-visible { outline: 3px solid #1e88e5; outline-offset: 2px; }
+  @media (max-width: 560px) {
+    .cz { grid-template-columns: 1fr; }
+    .cz-stage { position: static; grid-template-columns: auto 1fr; justify-items: start; align-items: center; }
+    #pv { width: 120px; height: 120px; }
+    .cz-tag { top: 6px; font-size: 11px; max-width: 110px; }
+    .cz-petpv { right: 10px; bottom: 16px; font-size: 20px; }
+    .cz-side { display: grid; gap: 10px; justify-items: start; }
+  }
+  @media (prefers-reduced-motion: reduce) { .cz-petpv { animation: none; } }
+  /* ----- Popup gian hàng ----- */
+  .shop-top { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; }
+  .shop-top canvas { width: 48px; height: 48px; image-rendering: pixelated; flex: none; }
+  .shop-top .say { position: relative; background: #fff; border: 2px solid #3e2723; border-radius: 10px; padding: 6px 10px;
+    font-size: 13px; font-weight: 600; color: #3e2723; }
+  .shop-top .say::before { content: ""; position: absolute; left: -8px; top: 50%; margin-top: -6px;
+    border: 6px solid transparent; border-right: 8px solid #3e2723; border-left: 0; }
+  .shop-top .say b { color: var(--c); }
+  .card { position: relative; display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden; cursor: pointer;
+    border: 1px solid #eee3c8; border-radius: 12px; background: #fff; font: inherit; color: inherit; transition: transform .12s, box-shadow .12s; }
+  .card:hover, .card:focus-visible { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(0,0,0,.12); outline: none; border-color: var(--c); }
+  .pic { display: grid; place-items: center; aspect-ratio: 4 / 3; font-size: 56px; background: linear-gradient(135deg, var(--c1), var(--c2)); }
+  .pic img, .hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card .bd { display: grid; gap: 3px; padding: 10px; }
+  .card .nm { font-weight: 700; color: #333; font-size: 14px; }
+  .rate { font-size: 12px; color: #8d6e63; }
+  .pr { color: #d84315; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .old { color: #9e9e9e; text-decoration: line-through; font-weight: 500; font-size: .85em; margin-left: 6px; }
+  .card .more { margin-top: 6px; border-radius: 8px; padding: 7px; background: var(--c); color: #fff; font-weight: 700; font-size: 13px; text-align: center; }
+  .off { position: absolute; top: 8px; left: 8px; background: #d84315; color: #fff; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+  .detail { display: grid; gap: 12px; min-width: 0; }
+  .hero { position: relative; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; display: grid; place-items: center; font-size: 110px;
+    background: linear-gradient(135deg, var(--c1), var(--c2)); touch-action: pan-y; user-select: none; }
+  .hero .emo { animation: pop .25s ease-out; }
+  @keyframes pop { from { transform: scale(.7); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .hero .emo { animation: none; } }
+  .nav { position: absolute; top: 50%; width: 42px; height: 42px; margin-top: -21px; border-radius: 50%; border: 0; cursor: pointer;
+    background: rgba(255,255,255,.92); color: #3e2723; font-size: 20px; font-weight: 800; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
+  .nav.prev { left: 10px; } .nav.next { right: 10px; }
+  .dots { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; gap: 6px; }
+  .dots i { width: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.6); transition: width .2s; }
+  .dots i.on { width: 22px; background: #fff; }
+  .thumbs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .thumbs button { flex: none; width: 56px; height: 56px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; font-size: 28px;
+    background: linear-gradient(135deg, var(--c1), var(--c2)); overflow: hidden; padding: 0; }
+  .thumbs button.on { border-color: var(--c); }
+  .detail h3 { margin: 0; font-size: 20px; color: #3e2723; text-wrap: balance; }
+  .detail .pr { font-size: 22px; }
+  .detail p { margin: 0; color: #555; line-height: 1.5; }
+  .opts { display: grid; gap: 6px; } .opts .lb { font-size: 12px; font-weight: 700; color: #8d6e63; text-transform: uppercase; letter-spacing: .05em; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { border: 1px solid #ddd; border-radius: 999px; padding: 5px 12px; background: #fff; cursor: pointer; font: inherit; font-size: 13px; color: #333; }
+  .chip.on { border-color: var(--c); color: var(--c); font-weight: 700; box-shadow: inset 0 0 0 1px var(--c); }
+  .buy { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .buy a, .buy button { display: block; padding: 12px 8px; border-radius: 10px; border: 0; font: inherit; font-weight: 800; text-align: center;
+    text-decoration: none; color: #fff; cursor: pointer; }
+  .buy .shopee { background: #ee4d2d; } .buy .tiktok { background: #161823; }
+  .buy button[disabled] { opacity: .45; cursor: not-allowed; }
+  .note { margin: -4px 0 0; font-size: 12px; color: #9e9e9e; text-align: center; }
+  .back { justify-self: start; border: 0; background: none; padding: 0; color: #5d4037; font: inherit; font-weight: 700; cursor: pointer; }
+  .card:focus-visible, .nav:focus-visible, .chip:focus-visible, .thumbs button:focus-visible, .back:focus-visible, .buy *:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+  .picker { display: flex; gap: 20px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  #pv { width: 128px; height: 128px; image-rendering: pixelated; background: #e8f0d8; border-radius: 12px; }
+  .picker { align-items: flex-start; }
+  .pv-wrap { position: relative; display: grid; justify-items: center; gap: 8px; }
+  .pv-wrap .tag { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    background: #3e2723; padding: 3px 12px; border-radius: 999px; font-weight: 800; font-size: 13px; }
+  .pv-wrap .pet { position: absolute; right: -18px; top: 92px; font-size: 30px; }
+  .sec { font-size: 12px; font-weight: 800; color: #8d6e63; text-transform: uppercase; letter-spacing: .06em;
+    border-bottom: 1px solid #eee3c8; padding-bottom: 4px; }
+  .field { display: grid; gap: 6px; }
+  .field > span { font-weight: 600; color: #333; font-size: 14px; }
+  .field input { font: inherit; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #333; }
+  .field input:focus { outline: 2px solid #1e88e5; border-color: transparent; }
+  .sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #3e2723; cursor: pointer; padding: 0; }
+  .sw.on { box-shadow: 0 0 0 3px #fffdf7, 0 0 0 5px #1e88e5; }
+  .rows { display: grid; gap: 8px; flex: 1; min-width: 220px; }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row span { flex: 1; color: #333; font-weight: 600; }
+  .row b { width: 48px; text-align: center; color: #555; font-variant-numeric: tabular-nums; }
+  .row button { border: 1px solid #ddd; background: #fff; border-radius: 8px; width: 36px; height: 32px; cursor: pointer; }
+  .row button:focus-visible { outline: 2px solid #1e88e5; }
+  .row .wide { flex: 1; width: auto; font-weight: 600; }
+  .row .primary { background: #1e88e5; color: #fff; border-color: #1e88e5; }
+  #avaBtn { position: fixed; top: 12px; right: 12px; background: #fff8e1; color: #5d4037; border: 0;
+    padding: 8px 12px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  #avaBtn canvas { width: 24px; height: 24px; image-rendering: pixelated; }
+  /* Điều khiển cảm ứng: chỉ hiện khi máy có màn hình cảm ứng (body.touch) */
+  #stick, #actBtn { display: none; }
+  body.touch #stick { display: block; position: fixed; width: 132px; height: 132px; border-radius: 50%;
+    left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255,248,225,.2); border: 3px solid rgba(255,248,225,.65); touch-action: none; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%;
+    background: #fff8e1; border: 3px solid #5d4037; box-shadow: 0 3px 8px rgba(0,0,0,.35); pointer-events: none; }
+  body.touch #actBtn { display: flex; position: fixed; width: 108px; height: 108px; border-radius: 50%;
+    right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(36px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px;
+    background: #ffb300; color: #3e2723; border: 4px solid #5d4037; font: 800 12px/1.15 system-ui, sans-serif; text-align: center;
+    box-shadow: 0 5px 0 #5d4037, 0 8px 16px rgba(0,0,0,.35); touch-action: manipulation; transition: opacity .15s, filter .15s; }
+  #actBtn .ico { font-size: 34px; line-height: 1; }
+  #actBtn[disabled] { opacity: .45; filter: grayscale(1); box-shadow: 0 3px 0 #5d4037; }
+  #actBtn.ready { animation: pulse 1s ease-in-out infinite; }
+  #actBtn:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 1px 0 #5d4037; animation: none; }
+  @keyframes pulse { 50% { transform: scale(1.08); } }
+  @media (prefers-reduced-motion: reduce) { #actBtn.ready { animation: none; } }
+  body.touch #hint { display: none !important; }
+  body.touch #hud .keys, body:not(.touch) #hud .tips { display: none; }
+  body.touch #hud { font-size: 12px; max-width: 58vw; }
+  @media (max-width: 600px) { #avaBtn .t { display: none; } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <b>🏮 Chợ Phiên 2D</b>
+  <span class="keys"><br>Di chuyển: WASD / phím mũi tên / chạm-click vào bản đồ<br>
+  Vào gian: đứng trước gian rồi nhấn <b>E</b> hoặc click thẳng vào gian<br>
+  Nhân vật (tên, ngoại hình, thú cưng): nhấn <b>C</b> hoặc nút góc phải<br>
+  Cảnh chợ (ngày đêm, theme): nhấn <b>T</b><br>
+  Nhắn tin cho mọi người: nhấn <b>Enter</b></span>
+  <span class="tips"><br>Kéo cần tròn để đi, hoặc chạm vào bản đồ<br>Tới trước gian thì bấm nút vàng</span>
+</div>
+<div id="stick" aria-label="Cần điều khiển di chuyển"><div id="knob"></div></div>
+<button id="actBtn" disabled><span class="ico">🏪</span><span class="lbl">Vào gian</span></button>
+<button id="avaBtn"><canvas id="avaIcon" width="16" height="16"></canvas><span class="t">Nhân vật</span></button>
+<button id="sceneBtn" aria-label="Cảnh chợ: ngày đêm và theme"><span class="ic">☀️</span><span class="t">12:00</span></button>
+<button id="soundBtn" aria-label="Bật hoặc tắt âm thanh" aria-pressed="true">🔊</button>
+<button id="netBtn" aria-label="Số người trong chợ, bấm để nhắn tin"><span class="dot"></span><span>💬</span><span class="n">…</span></button>
+<form id="chatBar" hidden><input id="chatIn" maxlength="60" placeholder="Nói gì đó với mọi người…" autocomplete="off" enterkeyhint="send" aria-label="Tin nhắn"><button type="submit">Gửi</button></form>
+<div id="audioHint" hidden>🔊 Chạm vào màn hình để bật âm thanh</div>
+<div id="hint"></div>
+<div id="modal">
+  <div class="box">
+    <header id="mhead"><h2 id="mtitle"></h2><button id="mclose" aria-label="Đóng">✕</button></header>
+    <div id="grid"></div>
+  </div>
+</div>
+
+<script>
+// ===== Dữ liệu gian hàng =====
+const STALLS = [
+  { name: "Áo Quần",   color: "#e53935", icon: "👕" },
+  { name: "Giày Dép",  color: "#8e24aa", icon: "👟" },
+  { name: "Phụ Kiện",  color: "#3949ab", icon: "🎒" },
+  { name: "Mỹ Phẩm",   color: "#d81b60", icon: "💄" },
+  { name: "Đồ Ăn",     color: "#fb8c00", icon: "🍜" },
+  { name: "Nước Uống", color: "#00897b", icon: "🧋" },
+  { name: "Trái Cây",  color: "#43a047", icon: "🍉" },
+  { name: "Bánh Kẹo",  color: "#f06292", icon: "🍬" },
+];
+
+// ===== Sản phẩm từng gian =====
+// e: emoji tạm thay ảnh; img: link ảnh thật (để trống thì dùng emoji); old: giá gốc nếu đang giảm;
+// opts: tuỳ chọn hiển thị; links: link Shopee / TikTok (affiliate) sẽ gắn sau.
+const P = (e, name, price, old, rating, sold, desc, opts) =>
+  ({ e, name, price, old, rating, sold, desc, opts, img: "", links: { shopee: "", tiktok: "" } });
+const SIZE = (...v) => ({ label: "Kích cỡ", values: v }), COLOR = (...v) => ({ label: "Màu", values: v }), KIND = (...v) => ({ label: "Loại", values: v });
+const PRODUCTS = [
+  [P("👕", "Áo thun cotton", 120000, 150000, 4.8, 1200, "Cotton 100% mềm mát, form unisex rộng rãi, mặc đi chơi hay ở nhà đều hợp.", SIZE("S", "M", "L", "XL")),
+   P("👗", "Váy hoa nhí", 250000, 0, 4.7, 860, "Váy voan hoa nhí dáng xoè, có lớp lót, hợp đi biển và dạo phố.", SIZE("S", "M", "L")),
+   P("🧥", "Áo khoác dù", 390000, 450000, 4.6, 540, "Chống gió nhẹ, có mũ trùm, gấp gọn bỏ vừa balo.", SIZE("M", "L", "XL")),
+   P("👖", "Quần jean ống suông", 320000, 0, 4.8, 2100, "Jean co giãn nhẹ, ống suông dễ mặc, màu xanh wash cổ điển.", SIZE("28", "29", "30", "31", "32"))],
+  [P("👟", "Sneaker trắng", 450000, 520000, 4.9, 3400, "Đế cao su êm chân, dễ phối đồ, lau chùi nhanh sạch.", SIZE("38", "39", "40", "41", "42")),
+   P("🩴", "Dép tổ ong", 35000, 0, 4.9, 10000, "Huyền thoại bền bỉ, lội mưa thoải mái, giá hạt dẻ.", SIZE("38", "39", "40", "41", "42", "43")),
+   P("👞", "Giày tây da bò", 520000, 0, 4.6, 420, "Da bò mềm, đế khâu chắc chắn, hợp đi làm và đi tiệc.", SIZE("39", "40", "41", "42", "43")),
+   P("👢", "Boot cổ cao", 680000, 790000, 4.5, 210, "Da lộn, khoá kéo bên hông, giữ ấm khi trời lạnh.", SIZE("36", "37", "38", "39"))],
+  [P("🎒", "Balo laptop", 290000, 0, 4.8, 1800, "Ngăn chống sốc cho laptop 15.6 inch, vải chống thấm nước.", COLOR("Đen", "Xám", "Xanh navy")),
+   P("🧢", "Nón kết kaki", 90000, 0, 4.7, 2600, "Vải kaki dày, khoá chỉnh vòng đầu, che nắng tốt.", COLOR("Đen", "Trắng", "Be")),
+   P("🕶️", "Kính mát phân cực", 150000, 199000, 4.6, 980, "Tròng phân cực chống tia UV400, gọng nhựa dẻo nhẹ.", COLOR("Đen", "Trà")),
+   P("⌚", "Đồng hồ dây da", 800000, 0, 4.7, 330, "Máy quartz Nhật, kính khoáng, chống nước đi mưa.", COLOR("Nâu", "Đen"))],
+  [P("💄", "Son lì mềm môi", 180000, 0, 4.8, 5100, "Lên màu chuẩn, không khô môi, giữ màu khoảng 6 tiếng.", COLOR("Đỏ gạch", "Hồng đất", "Cam cháy")),
+   P("🧴", "Kem dưỡng ẩm", 240000, 280000, 4.7, 2300, "Kết cấu gel thấm nhanh, hợp da dầu và da hỗn hợp.", KIND("50ml", "100ml")),
+   P("🌸", "Nước hoa 50ml", 560000, 0, 4.6, 640, "Hương hoa nhài và gỗ đàn hương, lưu hương 6–8 tiếng."),
+   P("🪞", "Gương trang điểm", 60000, 0, 4.8, 3900, "Gương gập 2 mặt, một mặt phóng to 3 lần.")],
+  [P("🍜", "Phở bò", 45000, 0, 4.9, 8200, "Nước dùng hầm xương 12 tiếng, bánh phở tươi, thịt bò thái mỏng.", KIND("Tái", "Nạm", "Tái nạm")),
+   P("🥖", "Bánh mì thịt", 25000, 0, 4.8, 12000, "Vỏ giòn ruột mềm, pate nhà làm, đồ chua và rau thơm.", KIND("Thịt nguội", "Xíu mại", "Trứng ốp")),
+   P("🍢", "Xiên que chiên", 10000, 0, 4.6, 6500, "Cá viên, bò viên chiên giòn, chấm tương ớt."),
+   P("🍚", "Cơm tấm sườn", 40000, 0, 4.8, 7100, "Sườn nướng than hoa, bì chả, mỡ hành, nước mắm kẹo.", KIND("Sườn", "Sườn bì chả"))],
+  [P("🧋", "Trà sữa trân châu", 35000, 0, 4.8, 9300, "Trà đen pha đậm, trân châu đường đen dẻo dai.", SIZE("M", "L")),
+   P("☕", "Cà phê sữa đá", 25000, 0, 4.9, 11000, "Pha phin truyền thống, robusta Buôn Ma Thuột, sữa đặc.", SIZE("M", "L")),
+   P("🥥", "Nước dừa xiêm", 20000, 0, 4.7, 4400, "Dừa xiêm Bến Tre ngọt thanh, uống nguyên trái."),
+   P("🍹", "Sinh tố bơ", 30000, 35000, 4.7, 3200, "Bơ sáp xay mịn với sữa đặc, béo ngậy.", SIZE("M", "L"))],
+  [P("🍉", "Dưa hấu (1kg)", 30000, 0, 4.7, 2200, "Ruột đỏ, vỏ mỏng, ngọt mát ngày nắng."),
+   P("🥭", "Xoài cát Hoà Lộc (1kg)", 45000, 55000, 4.9, 3100, "Thơm, ngọt lịm, thịt dày ít xơ."),
+   P("🍌", "Chuối già (1 nải)", 20000, 0, 4.6, 1900, "Chuối chín cây, ăn sáng hoặc làm sinh tố đều ngon."),
+   P("🍊", "Cam sành (1kg)", 35000, 0, 4.7, 2700, "Nhiều nước, vị ngọt chua, giàu vitamin C.")],
+  [P("🍬", "Kẹo dừa Bến Tre", 40000, 0, 4.9, 4600, "Làm từ nước cốt dừa tươi, dẻo thơm, hộp 400g.", KIND("Truyền thống", "Lá dứa", "Sầu riêng")),
+   P("🍪", "Bánh quy bơ", 55000, 65000, 4.7, 2800, "Hộp thiếc 300g, giòn tan, thơm mùi bơ."),
+   P("🍩", "Donut", 15000, 0, 4.6, 1500, "Làm mới mỗi sáng, phủ nhân tuỳ chọn.", KIND("Socola", "Đường", "Dâu")),
+   P("🍫", "Sô-cô-la đen 70%", 60000, 0, 4.8, 1100, "Cacao Việt Nam, đắng nhẹ, ít ngọt.")],
+];
+STALLS.forEach((s, i) => s.items = PRODUCTS[i]);
+
+// ===== Bố cục thế giới =====
+const WORLD = { w: 1440, h: 1008 }; // 30 x 21 ô, mỗi ô 48px
+const STALL_W = 220, STALL_H = 190, ZONE_H = 70;
+const ROAD = { y: 336, h: 288 }; // dải giữa hai dãy gian (hàng ô 7..12), đường đất uốn lượn trong dải này
+// tâm đường (tính theo hàng ô) tại cột c: hai sóng sin chồng nhau cho đường ngoằn ngoèo tự nhiên
+const centerAt = c => (ROAD.y + ROAD.h / 2) / 48 + 1.4 * Math.sin(c * 0.42) + 0.6 * Math.sin(c * 0.9 + 1.3);
+const KINDS = ["clothes", "shoes", "accessories", "cosmetics", "food", "drinks", "fruit", "candy"];
+STALLS.forEach((s, i) => {
+  const top = i < 4, col = i % 4;
+  s.kind = KINDS[i];
+  s.x = 140 + col * 290;
+  s.y = top ? ROAD.y - STALL_H - 10 : ROAD.y + ROAD.h + 10;
+  s.w = STALL_W; s.h = STALL_H; s.top = top;
+  // vùng tương tác: dải ngay trước mặt gian (phía đường)
+  s.zone = { x: s.x + 20, y: top ? s.y + s.h : s.y - ZONE_H, w: s.w - 40, h: ZONE_H };
+});
+const TREES = [[60,120],[60,860],[1340,120],[1340,860],[700,60],[700,940],[420,940],[980,60]];
+const SOLIDS = [...STALLS.map(s => ({ x: s.x, y: s.y, w: s.w, h: s.h })),
+                ...TREES.map(([x,y]) => ({ x: x-22, y: y-10, w: 44, h: 30 }))];
+
+// ===== Asset Kenney (CC0): Tiny Town + Roguelike Characters, nhúng base64 để chạy ở mọi nơi =====
+const TOWN_PNG = "data:image/png;base64,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";
+const CHARS_PNG = "data:image/png;base64,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";
+const loadImg = src => new Promise((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = src; });
+const T = 48; // 1 ô 16px gốc phóng 3 lần
+let TOWN, CHARS;
+// Tiny Town (tilemap_packed): lưới 12x11 ô 16px sát nhau
+const tile = (c, r, x, y, g = ctx) => g.drawImage(TOWN, c * 16, r * 16, 16, 16, x, y, T, T);
+
+// Roguelike Characters: ô 16px cách nhau 1px; nhân vật ghép từ nhiều lớp chồng lên nhau
+const PARTS = {
+  skin:      { label: "Màu da",   opts: [[1,0],[1,1],[1,2],[1,3]] },
+  shirt:     { label: "Áo",       opts: [[6,0],[8,0],[10,0],[12,0],[14,0],[16,0],[6,5],[8,5],[10,5],[14,5],[16,5],[12,8],[8,8],[7,2]] },
+  pants:     { label: "Quần",     opts: [0,1,2,5,6,7,8] },               // hàng ở cột 3 (quần) + cột 4 (giày)
+  hair:      { label: "Kiểu tóc", opts: [null,[0,0],[1,0],[3,1],[2,0],[3,0]] }, // lệch trong nhóm màu tóc; null = trọc
+  hairColor: { label: "Màu tóc",  opts: [[19,0],[23,0],[19,4],[23,4],[19,8]] },
+  hat:       { label: "Mũ",       opts: [null,[28,2],[30,3],[29,5],[31,4],[28,7],[29,8],[30,0]] },
+};
+const spriteCache = new Map();
+function sprite(av) {
+  const key = JSON.stringify(av);
+  if (!spriteCache.has(key)) {
+    const cv = document.createElement("canvas"); cv.width = cv.height = 16;
+    const g = cv.getContext("2d"), P = PARTS, row = P.pants.opts[av.pants];
+    const layers = [P.skin.opts[av.skin], [3, row], [4, row], P.shirt.opts[av.shirt]];
+    const hs = P.hair.opts[av.hair];
+    if (hs) { const [c, r] = P.hairColor.opts[av.hairColor]; layers.push([c + hs[0], r + hs[1]]); }
+    if (P.hat.opts[av.hat]) layers.push(P.hat.opts[av.hat]);
+    layers.forEach(([c, r]) => g.drawImage(CHARS, c * 17, r * 17, 16, 16, 0, 0, 16, 16));
+    spriteCache.set(key, cv);
+  }
+  return spriteCache.get(key);
+}
+// Bộ Kenney chỉ có dáng đứng, nên tự sinh khung bước chân: nhấc một chân lên 1px (để hở mặt đất),
+// hai bàn tay đánh lệch nhau 1px. Vòng lặp 4 khung: đứng, bước trái, đứng, bước phải.
+// Bố cục sprite 16x16: chân ở hàng 13-15 (cột 3-12), bàn tay ở hàng 10-14 (cột 0-2 và 13-15).
+function makeStep(base, side) {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 16;
+  const g = cv.getContext("2d"), src = base.getContext("2d").getImageData(0, 0, 16, 16).data, out = g.createImageData(16, 16);
+  const put = (x, y, sx, sy) => {
+    if (sy < 0 || sy > 15) return;
+    const i = (sy * 16 + sx) * 4; if (!src[i + 3]) return;
+    out.data.set(src.subarray(i, i + 4), (y * 16 + x) * 4);
+  };
+  const lifted = x => side ? x >= 8 : x < 8;
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const hand = (x <= 2 || x >= 13) && y >= 10;
+    if (y >= 13 && x >= 3 && x <= 12) { if (!lifted(x)) put(x, y, x, y); }
+    else if (hand) put(x, y, x, y + (lifted(x) ? -1 : 1));
+    else put(x, y, x, y);
+  }
+  for (let y = 12; y < 15; y++) for (let x = 3; x <= 12; x++) if (lifted(x)) put(x, y, x, y + 1); // chân nhấc đè lên mép thân
+  g.putImageData(out, 0, 0);
+  return cv;
+}
+const framesCache = new Map();
+function framesOf(av) {
+  const key = JSON.stringify(av);
+  if (!framesCache.has(key)) { const b = sprite(av); framesCache.set(key, [b, makeStep(b, 0), b, makeStep(b, 1)]); }
+  return framesCache.get(key);
+}
+const randomAvatar = () => Object.fromEntries(Object.entries(PARTS).map(([k, p]) =>
+  [k, k === "hat" && Math.random() < 0.6 ? 0
+      : k === "skin" && Math.random() < 0.9 ? Math.random() * 3 | 0 // da xanh (orc) hiếm thôi
+      : Math.random() * p.opts.length | 0]));
+const DEFAULT_AVATAR = { skin: 0, shirt: 2, pants: 0, hair: 1, hairColor: 0, hat: 0 };
+const loadAvatar = () => {
+  try {
+    const a = JSON.parse(localStorage.getItem("cho.avatar2"));
+    if (a && Object.keys(PARTS).every(k => a[k] >= 0 && a[k] < PARTS[k].opts.length)) return a;
+  } catch {}
+  return { ...DEFAULT_AVATAR };
+};
+const saveAvatar = a => { try { localStorage.setItem("cho.avatar2", JSON.stringify(a)); } catch {} };
+
+// ===== Nhân vật =====
+function makeChar(x, y, name, avatar) {
+  return { x, y, name, avatar, dir: 1, walk: 0, moving: false, target: null, stuck: 0,
+           pendingStall: null, wait: 0 };
+}
+// Hồ sơ người chơi: tên, màu tên, trạng thái, thú cưng (lưu trên trình duyệt)
+const NAME_COLORS = ["#ffeb3b", "#ffffff", "#80deea", "#a5d6a7", "#f48fb1", "#ffab91", "#ce93d8"];
+const STATUSES = ["", "🛍️", "😋", "💸", "☕", "🎉", "😎", "💤"];
+const PETS = [null, "🐶", "🐱", "🐰", "🐥", "🐷", "🦆"];
+const PET_NAMES = ["Không", "Cún", "Mèo", "Thỏ", "Gà con", "Heo", "Vịt"];
+const NAME_MAX = 16;
+function loadProfile() {
+  const d = { name: "Bạn", color: 0, status: 0, pet: 0 };
+  try {
+    const p = JSON.parse(localStorage.getItem("cho.profile"));
+    if (p) {
+      if (typeof p.name === "string" && p.name.trim()) d.name = p.name.trim().slice(0, NAME_MAX);
+      for (const [k, arr] of [["color", NAME_COLORS], ["status", STATUSES], ["pet", PETS]]) if (p[k] >= 0 && p[k] < arr.length) d[k] = p[k];
+    }
+  } catch {}
+  return d;
+}
+const saveProfile = p => { try { localStorage.setItem("cho.profile", JSON.stringify(p)); } catch {} };
+const profile = loadProfile();
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const player = makeChar(140, ROAD.y + ROAD.h / 2, profile.name, loadAvatar());
+const playerLabel = () => `${STATUSES[profile.status]} ${player.name}`.trim();
+// Thú cưng chạy theo sau lưng người chơi
+const pet = { x: player.x - 34, y: player.y + 4, dir: 1, moving: false, walk: 0 };
+function updatePet(dt) {
+  if (!PETS[profile.pet]) return;
+  const tx = player.x - player.dir * 34, ty = player.y + 4, dx = tx - pet.x, dy = ty - pet.y, d = Math.hypot(dx, dy);
+  if (d > 300) { pet.x = tx; pet.y = ty; return; } // bị bỏ quá xa thì nhảy tới luôn
+  pet.moving = d > 6;
+  if (!pet.moving) return;
+  const sp = Math.min(d, Math.max(1.2 * dt, d * (1 - Math.pow(0.92, dt)))); // đuổi theo nhanh khi xa, chậm lại khi gần
+  pet.x += dx / d * sp; pet.y += dy / d * sp; pet.walk += sp * 0.15;
+  if (Math.abs(dx) > 1) pet.dir = dx > 0 ? 1 : -1;
+}
+function drawPet(p = pet, e = PETS[profile.pet]) {
+  const hop = p.moving ? Math.abs(Math.sin(p.walk)) * 6 : 0;
+  ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(p.x, p.y, 10, 4, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(p.x, p.y - 13 - hop); if (p.dir > 0) ctx.scale(-1, 1); // emoji thú nhìn sang trái
+  emoji(e, 0, 0, 24); ctx.restore();
+}
+const NAMES = ["Cô Ba","Chú Tư","Bé Na","Anh Hai","Chị Mai","Ông Sáu","Bé Bin"];
+// ===== Chủ tiệm: mỗi gian một người, đứng ngay cạnh lối vào, chào khách và rao hàng =====
+const KEEPERS = [
+  { name: "Cô Hoa",   av: { skin: 0, shirt: 4,  pants: 1, hair: 2, hairColor: 3, hat: 0 },
+    greet: ["Vào xem đồ mới về nè em ơi!", "Áo đẹp giá mềm, thử đi con!"], ads: ["Áo thun đồng giá 120k nè!", "Sale 50% hôm nay thôi nha!"] },
+  { name: "Anh Tùng", av: { skin: 1, shirt: 2,  pants: 0, hair: 1, hairColor: 3, hat: 1 },
+    greet: ["Giày xịn đi êm chân lắm bạn ơi!", "Size nào cũng có nha!"], ads: ["Dép tổ ong 35k, bền cả năm!", "Sneaker mới về đây!"] },
+  { name: "Chị Linh", av: { skin: 0, shirt: 9,  pants: 2, hair: 3, hairColor: 1, hat: 0 },
+    greet: ["Kính, nón, balo đủ cả nè!", "Ghé xem phụ kiện xinh nha!"], ads: ["Đồng hồ mới về, ghé xem nè!", "Nón kết 90k thôi!"] },
+  { name: "Chị Vy",   av: { skin: 0, shirt: 5,  pants: 3, hair: 2, hairColor: 2, hat: 0 },
+    greet: ["Son mới lên màu đẹp lắm em!", "Thử kem dưỡng miễn phí nè!"], ads: ["Mua 2 tặng 1 nè các chị ơi!", "Nước hoa thơm lâu lắm!"] },
+  { name: "Bác Năm",  av: { skin: 1, shirt: 13, pants: 4, hair: 5, hairColor: 4, hat: 0 },
+    greet: ["Phở nóng đây, ngồi xuống ăn tô con!", "Đói chưa con? Vô ăn nè!"], ads: ["Bánh mì nóng giòn đâyyy!", "Phở bò tái nạm 45k!"] },
+  { name: "Bé Thảo",  av: { skin: 0, shirt: 3,  pants: 5, hair: 3, hairColor: 3, hat: 2 },
+    greet: ["Trà sữa trân châu ngon lắm ạ!", "Uống gì cho mát hông anh chị?"], ads: ["Nước dừa mát lạnh đây!", "Cà phê sữa đá 25k nè!"] },
+  { name: "Cô Sáu",   av: { skin: 2, shirt: 6,  pants: 6, hair: 2, hairColor: 3, hat: 0 },
+    greet: ["Trái cây tươi mới hái nè con!", "Ăn thử miếng xoài nè!"], ads: ["Xoài cát ngọt lịm đây!", "Dưa hấu ruột đỏ, bao ngọt!"] },
+  { name: "Chú Bảy",  av: { skin: 1, shirt: 11, pants: 0, hair: 4, hairColor: 0, hat: 0 },
+    greet: ["Kẹo dừa Bến Tre chính gốc nè!", "Bánh mới ra lò, thơm phức!"], ads: ["Kẹo dừa 40k một hộp!", "Donut 15k, ăn là ghiền!"] },
+];
+const keepers = STALLS.map((st, i) => {
+  const k = makeChar(st.x - 2, st.top ? st.y + st.h + 28 : st.y - 8, KEEPERS[i].name, KEEPERS[i].av);
+  Object.assign(k, KEEPERS[i], { keeper: true, stall: st, bubble: null, hopUntil: 0, nextAd: 4 + Math.random() * 10 });
+  SOLIDS.push({ x: k.x - 11, y: k.y - 14, w: 22, h: 14 });
+  return k;
+});
+const pick = a => a[Math.random() * a.length | 0];
+function say(k, text, secs, t) {
+  k.bubble = { text, from: t, until: t + secs };
+  const vol = Math.max(0, 1 - Math.hypot(player.x - k.x, player.y - k.y) / 420); // càng xa tiếng càng nhỏ
+  if (vol > .05) sfx("talk", keepers.indexOf(k), vol);
+}
+
+const npcs = NAMES.map((n, i) => makeChar(300 + i * 140, ROAD.y + 60 + (i % 3) * 80, n, randomAvatar()));
+
+const BODY = { w: 22, h: 14 }; // hộp va chạm ở chân
+function blocked(x, y) {
+  const l = x - BODY.w/2, r = x + BODY.w/2, t = y - BODY.h, b = y;
+  if (l < 0 || r > WORLD.w || t < 0 || b > WORLD.h) return true;
+  return SOLIDS.some(o => r > o.x && l < o.x + o.w && b > o.y && t < o.y + o.h);
+}
+function tryMove(c, dx, dy) {
+  const ox = c.x, oy = c.y;
+  if (!blocked(c.x + dx, c.y)) c.x += dx;
+  if (!blocked(c.x, c.y + dy)) c.y += dy;
+  c.moving = Math.abs(c.x - ox) + Math.abs(c.y - oy) > 0.1;
+  if (Math.abs(dx) > 0.1) c.dir = dx > 0 ? 1 : -1;
+  if (c.moving) c.walk += Math.hypot(c.x - ox, c.y - oy) * 0.055; // nhịp bước theo quãng đường đã đi
+  return c.moving;
+}
+function moveToward(c, speed, dt = 1) {
+  const dx = c.target.x - c.x, dy = c.target.y - c.y, d = Math.hypot(dx, dy);
+  if (d < 4) { c.target = null; c.moving = false; return true; }
+  const s = Math.min(speed * dt, d);
+  if (!tryMove(c, dx / d * s, dy / d * s)) {
+    if ((c.stuck += dt) > 20) { c.target = null; c.stuck = 0; }
+  } else c.stuck = 0;
+  return false;
+}
+const inRect = (x, y, r) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+
+// ===== Input =====
+const keys = {};
+addEventListener("keydown", e => {
+  if (modalOpen()) {
+    if (e.key === "Escape") { if (view && view.i !== null) { view.i = null; renderShop(); } else closeStall(); }
+    else if (view && view.i !== null && (e.key === "ArrowLeft" || e.key === "ArrowRight")) stepItem(e.key === "ArrowRight" ? 1 : -1);
+    return;
+  }
+  if (e.target && e.target.id === "chatIn") return; // đang gõ tin nhắn
+  if (e.key === "Enter") { e.preventDefault(); openChat(); return; }
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === "e" && nearStall) openStall(nearStall);
+  if (e.key.toLowerCase() === "c") openAvatarPicker();
+  if (e.key.toLowerCase() === "t") openSettings();
+});
+addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+const canvas = document.getElementById("game"), ctx = canvas.getContext("2d");
+const cam = { x: 0, y: 0, w: 0, h: 0 };
+canvas.addEventListener("pointerdown", e => {
+  if (modalOpen()) return;
+  const wx = e.clientX / VIEW + cam.x, wy = e.clientY / VIEW + cam.y;
+  const s = STALLS.find(s => inRect(wx, wy, s) || inRect(wx, wy, s.zone));
+  if (s) {
+    player.target = { x: s.x + s.w / 2, y: s.top ? s.zone.y + 40 : s.zone.y + 30 };
+    player.pendingStall = s;
+  } else {
+    player.target = { x: wx, y: wy }; player.pendingStall = null;
+  }
+});
+
+// ===== Popup gian hàng =====
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("vi-VN") + "đ";
+// Mở/đóng popup có hiệu ứng: hiện khung trước, sang khung hình sau mới thêm class "open" để CSS chạy transition;
+// khi đóng thì bỏ "open", đợi hiệu ứng xong mới ẩn hẳn. modalShown đổi ngay để game dừng/chạy tức thì.
+let modalShown = false, modalTimer;
+const modalOpen = () => modalShown;
+const MODAL_OUT_MS = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 200;
+function showModal() {
+  const m = $("modal"); clearTimeout(modalTimer); modalShown = true;
+  m.style.display = "flex";
+  requestAnimationFrame(() => requestAnimationFrame(() => modalShown && m.classList.add("open")));
+}
+function hideModal() {
+  const m = $("modal"); modalShown = false; m.classList.remove("open");
+  clearTimeout(modalTimer); modalTimer = setTimeout(() => { if (!modalShown) m.style.display = "none"; }, MODAL_OUT_MS);
+}
+// Popup gian hàng có 2 màn: danh sách món (view.i = null) và chi tiết một món (view.i = chỉ số)
+let view = null;
+const soldTxt = n => n >= 1000 ? (n / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 1 }) + "k" : n;
+const picHtml = p => p.img ? `<img src="${p.img}" alt="${p.name}">` : `<span class="emo" aria-hidden="true">${p.e}</span>`;
+const offPct = p => p.old ? Math.round((1 - p.price / p.old) * 100) : 0;
+function openStall(s) {
+  if (isClosed(s)) { say(keepers[STALLS.indexOf(s)], "Tiệm đóng cửa rồi, mai ghé nha!", 3.5, performance.now() / 1000); sfx("denied"); return; }
+  sfx("enter");
+  view = { s, i: null, opt: 0 };
+  renderShop();
+  showModal();
+  for (const k in keys) keys[k] = false;
+}
+function renderShop() {
+  const { s, i } = view, items = s.items, g = $("grid"), k = KEEPERS[STALLS.indexOf(s)];
+  $("mhead").style.background = s.color;
+  g.style.cssText = `--c:${s.color};--c1:${s.color}22;--c2:${s.color}55;grid-template-columns:repeat(2, minmax(0, 1fr))`; // 4 món: lưới 2x2
+  if (i === null) {
+    $("mtitle").textContent = `${s.icon} Gian ${s.name}`;
+    g.innerHTML = `<div class="shop-top"><canvas width="16" height="16"></canvas><div class="say"><b>${k.name}:</b> ${esc(player.name)} ơi! ${k.greet[0]}</div></div>` +
+      items.map((p, j) => `<button class="card" data-act="open" data-i="${j}">
+        ${p.old ? `<span class="off">-${offPct(p)}%</span>` : ""}
+        <div class="pic">${picHtml(p)}</div>
+        <div class="bd"><span class="nm">${p.name}</span><span class="rate">★ ${p.rating} · Đã bán ${soldTxt(p.sold)}</span>
+        <span class="pr">${fmt(p.price)}${p.old ? `<span class="old">${fmt(p.old)}</span>` : ""}</span>
+        <span class="more">Xem chi tiết</span></div></button>`).join("");
+    g.querySelector(".shop-top canvas").getContext("2d").drawImage(sprite(k.av), 0, 0);
+    return;
+  }
+  const p = items[i], n = items.length;
+  $("mtitle").textContent = `${s.icon} ${s.name} › ${p.name}`;
+  g.style.gridTemplateColumns = "1fr";
+  const link = (url, cls, label) => url
+    ? `<a class="${cls}" href="${url}" target="_blank" rel="noopener sponsored">${label}</a>`
+    : `<button class="${cls}" disabled title="Chưa có link">${label}</button>`;
+  g.innerHTML = `<div class="detail">
+    <button class="back" data-act="back">← Quay lại gian ${s.name}</button>
+    <div class="hero" aria-label="Ảnh sản phẩm ${i + 1} trên ${n}">${picHtml(p)}
+      ${p.old ? `<span class="off">-${offPct(p)}%</span>` : ""}
+      <button class="nav prev" data-act="prev" aria-label="Món trước">‹</button>
+      <button class="nav next" data-act="next" aria-label="Món sau">›</button>
+      <div class="dots">${items.map((_, j) => `<i class="${j === i ? "on" : ""}"></i>`).join("")}</div>
+    </div>
+    <div class="thumbs">${items.map((q, j) => `<button class="${j === i ? "on" : ""}" data-act="open" data-i="${j}" aria-label="${q.name}">${picHtml(q)}</button>`).join("")}</div>
+    <h3>${p.name}</h3>
+    <div class="rate">★ ${p.rating} · Đã bán ${soldTxt(p.sold)}</div>
+    <div class="pr">${fmt(p.price)}${p.old ? `<span class="old">${fmt(p.old)}</span>` : ""}</div>
+    <p>${p.desc}</p>
+    ${p.opts ? `<div class="opts"><span class="lb">${p.opts.label}</span><div class="chips">${p.opts.values.map((v, j) =>
+      `<button class="chip ${j === view.opt ? "on" : ""}" data-act="opt" data-v="${j}">${v}</button>`).join("")}</div></div>` : ""}
+    <div class="buy">${link(p.links.shopee, "shopee", "Mua trên Shopee")}${link(p.links.tiktok, "tiktok", "Mua trên TikTok")}</div>
+    ${p.links.shopee || p.links.tiktok ? "" : `<p class="note">Link mua hàng sẽ được gắn sau.</p>`}
+  </div>`;
+}
+function stepItem(d) { const n = view.s.items.length; view.i = (view.i + d + n) % n; view.opt = 0; renderShop(); }
+$("grid").addEventListener("click", e => {
+  if (!view) return;
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const act = el.dataset.act;
+  if (act === "open") { view.i = +el.dataset.i; view.opt = 0; renderShop(); $("grid").parentElement.scrollTop = 0; }
+  else if (act === "back") { view.i = null; renderShop(); }
+  else if (act === "prev" || act === "next") stepItem(act === "next" ? 1 : -1);
+  else if (act === "opt") { view.opt = +el.dataset.v; renderShop(); }
+});
+// Vuốt ngang trên ảnh để đổi món (điện thoại)
+let swipeX = null;
+$("grid").addEventListener("pointerdown", e => { if (view && view.i !== null && e.target.closest(".hero") && !e.target.closest(".nav")) swipeX = e.clientX; });
+$("grid").addEventListener("pointerup", e => {
+  if (swipeX === null) return; const dx = e.clientX - swipeX; swipeX = null;
+  if (Math.abs(dx) > 40) stepItem(dx < 0 ? 1 : -1);
+});
+// ===== Bảng nhân vật: 2 thẻ "Thông tin" và "Bề ngoài", chọn bằng hình thay vì bấm mũi tên =====
+let czTab = "info", czCat = "skin";
+const CZ_CATS = [["skin", "Màu da"], ["hair", "Tóc"], ["shirt", "Áo"], ["pants", "Quần"], ["hat", "Mũ"]];
+// Lấy màu chủ đạo của một ô trong sheet nhân vật để làm ô màu (da, tóc)
+const tileColor = (() => { const cache = {}; return ([c, r]) => {
+  const key = c + "," + r; if (cache[key]) return cache[key];
+  const cv = document.createElement("canvas"); cv.width = cv.height = 16; const g = cv.getContext("2d");
+  g.drawImage(CHARS, c * 17, r * 17, 16, 16, 0, 0, 16, 16);
+  const d = g.getImageData(0, 0, 16, 16).data, count = {};
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 200) { const k = `rgb(${d[i]},${d[i + 1]},${d[i + 2]})`; count[k] = (count[k] || 0) + 1; }
+  return cache[key] = Object.entries(count).sort((x, y) => y[1] - x[1])[0][0];
+}; })();
+function openAvatarPicker() {
+  view = null;
+  $("mtitle").textContent = "Nhân vật của bạn";
+  $("mhead").style.background = "#6d4c41";
+  $("grid").style.cssText = "grid-template-columns:1fr";
+  renderPicker();
+  showModal();
+  for (const k in keys) keys[k] = false;
+}
+function renderPicker() {
+  const a = player.avatar, pr = profile;
+  const opt = (act, key, v, on, inner, label) =>
+    `<button class="cz-opt ${on ? "on" : ""}" data-cz="${act}" data-k="${key}" data-v="${v}" aria-label="${label}" aria-pressed="${on}">${inner}</button>`;
+  const thumbs = key => PARTS[key].opts.map((o, i) => opt("part", key, i, a[key] === i,
+    o === null ? `<span class="none">∅</span>` : `<canvas width="16" height="16" data-thumb='${JSON.stringify({ ...a, [key]: i })}'></canvas>`,
+    `${PARTS[key].label} ${o === null ? "không có" : i + 1}`)).join("");
+  const swatches = (key, colors) => colors.map((c, i) =>
+    `<button class="cz-sw ${a[key] === i ? "on" : ""}" data-cz="part" data-k="${key}" data-v="${i}" style="background:${c}" aria-label="${PARTS[key].label} ${i + 1}"></button>`).join("");
+  let body;
+  if (czTab === "info") body = `
+    <label class="cz-field"><span class="cz-lb">Tên hiển thị <em id="pcount">${pr.name.length}/${NAME_MAX}</em></span>
+      <span class="cz-input"><span aria-hidden="true">✏️</span><input id="pname" maxlength="${NAME_MAX}" value="${esc(pr.name)}" placeholder="Nhập tên của bạn" autocomplete="off"></span></label>
+    <div class="cz-field"><span class="cz-lb">Màu tên</span><div class="cz-swatches">${NAME_COLORS.map((c, i) =>
+      `<button class="cz-sw ${i === pr.color ? "on" : ""}" data-cz="prof" data-k="color" data-v="${i}" style="background:${c}" aria-label="Màu tên ${i + 1}"></button>`).join("")}</div></div>
+    <div class="cz-field"><span class="cz-lb">Trạng thái <em>hiện trước tên</em></span>
+      <div class="cz-opts" style="grid-template-columns:repeat(4, 1fr)">${STATUSES.map((e, i) => opt("prof", "status", i, i === pr.status, e ? `<span class="ic">${e}</span>` : `<span class="none">∅</span>`, e ? `Trạng thái ${e}` : "Không có trạng thái")).join("")}</div></div>
+    <div class="cz-field"><span class="cz-lb">Thú cưng <em>chạy theo bạn</em></span>
+      <div class="cz-opts" style="grid-template-columns:repeat(4, 1fr)">${PETS.map((e, i) => opt("prof", "pet", i, i === pr.pet, `<span class="ic">${e || "🚫"}</span>${PET_NAMES[i]}`, PET_NAMES[i])).join("")}</div></div>`;
+  else body = `
+    <div class="cz-cats" role="tablist">${CZ_CATS.map(([k, l]) => `<button class="cz-cat ${k === czCat ? "on" : ""}" data-cz="cat" data-v="${k}" role="tab" aria-selected="${k === czCat}">${l}</button>`).join("")}</div>
+    ${czCat === "skin" ? `<div class="cz-swatches">${swatches("skin", PARTS.skin.opts.map(o => tileColor(o)))}</div>`
+    : czCat === "hair" ? `<div class="cz-field"><span class="cz-lb">Kiểu tóc</span><div class="cz-opts" style="grid-template-columns:repeat(3, 1fr)">${thumbs("hair")}</div></div>
+        <div class="cz-field"><span class="cz-lb">Màu tóc</span><div class="cz-swatches">${swatches("hairColor", PARTS.hairColor.opts.map(o => tileColor(o)))}</div></div>`
+    : `<div class="cz-opts" style="--min:60px">${thumbs(czCat)}</div>`}`;
+  $("grid").innerHTML = `<div class="cz">
+    <div class="cz-stage">
+      <div class="cz-scene"><canvas id="pv" width="64" height="64"></canvas>
+        <div class="cz-tag" style="color:${NAME_COLORS[pr.color]}">${esc(playerLabel())}</div>
+        ${PETS[pr.pet] ? `<div class="cz-petpv" aria-hidden="true">${PETS[pr.pet]}</div>` : ""}</div>
+      <div class="cz-side"><button class="cz-btn2" data-cz="rnd">🎲 Ngẫu nhiên</button>
+        <div class="cz-hint">Lựa chọn được lưu tự động</div></div>
+    </div>
+    <div class="cz-panel">
+      <div class="cz-tabs" role="tablist">
+        <button class="${czTab === "info" ? "on" : ""}" data-cz="tab" data-v="info" role="tab" aria-selected="${czTab === "info"}">✏️ Thông tin</button>
+        <button class="${czTab === "look" ? "on" : ""}" data-cz="tab" data-v="look" role="tab" aria-selected="${czTab === "look"}">👕 Bề ngoài</button>
+      </div>${body}
+    </div>
+    <button class="cz-done" data-cz="done">Xong, đi chợ thôi!</button>
+  </div>`;
+  $("grid").querySelectorAll("canvas[data-thumb]").forEach(c => c.getContext("2d").drawImage(sprite(JSON.parse(c.dataset.thumb)), 0, 0));
+  drawStage(performance.now() / 1000);
+}
+// Sân cỏ xem trước: nhân vật bước tại chỗ để thấy luôn animation đi bộ
+function drawStage(t) {
+  const cv = $("pv"); if (!cv) return;
+  const g = cv.getContext("2d"); g.imageSmoothingEnabled = false;
+  for (let y = 0; y < 64; y += 16) for (let x = 0; x < 64; x += 16)
+    g.drawImage(TOWN, ((x * 7 + y * 3) % 5 === 0 ? 2 : 1) * 16, 0, 16, 16, x, y, 16, 16);
+  g.fillStyle = "#e0a96d"; g.beginPath(); g.ellipse(32, 52, 22, 8, 0, 0, 7); g.fill();
+  g.fillStyle = "rgba(0,0,0,.25)"; g.beginPath(); g.ellipse(32, 54, 10, 3, 0, 0, 7); g.fill();
+  const f = Math.floor(t * 5) % 4;
+  g.drawImage(framesOf(player.avatar)[f], 16, 23 - (f % 2), 32, 32);
+}
+$("grid").addEventListener("click", e => {
+  const b = e.target.closest("[data-cz]"); if (!b) return;
+  const { cz, k, v } = b.dataset;
+  if (cz === "done") return closeStall();
+  if (cz === "tab") czTab = v;
+  else if (cz === "cat") czCat = v;
+  else if (cz === "prof") { profile[k] = +v; saveProfile(profile); }
+  else if (cz === "part") { player.avatar = { ...player.avatar, [k]: +v }; saveAvatar(player.avatar); updateAvaIcon(); }
+  else if (cz === "rnd") { player.avatar = randomAvatar(); saveAvatar(player.avatar); updateAvaIcon(); }
+  renderPicker();
+});
+$("grid").addEventListener("input", e => {
+  if (e.target.id !== "pname") return;
+  profile.name = e.target.value.slice(0, NAME_MAX); player.name = profile.name.trim() || "Bạn"; saveProfile(profile);
+  document.querySelector(".cz-tag").textContent = playerLabel(); // cập nhật tại chỗ để ô nhập không mất focus
+  $("pcount").textContent = `${profile.name.length}/${NAME_MAX}`;
+});
+$("grid").addEventListener("keydown", e => { if (e.target.id === "pname" && e.key === "Enter") e.target.blur(); });
+function updateAvaIcon() {
+  const g = $("avaIcon").getContext("2d"); g.clearRect(0, 0, 16, 16); g.drawImage(sprite(player.avatar), 0, 0);
+}
+$("avaBtn").onclick = openAvatarPicker;
+function closeStall() { if (modalShown) sfx("close"); hideModal(); view = null; }
+$("mclose").onclick = closeStall;
+$("modal").addEventListener("pointerdown", e => { if (e.target.id === "modal") closeStall(); });
+$("hint").onclick = () => nearStall && openStall(nearStall);
+
+// ===== Điều khiển cảm ứng: joystick ảo + nút "Vào gian" =====
+const joy = { active: false, id: null, dx: 0, dy: 0 };
+const enableTouch = () => document.body.classList.add("touch");
+const coarse = matchMedia("(pointer: coarse)");
+if (coarse.matches || navigator.maxTouchPoints > 0) enableTouch();
+coarse.addEventListener?.("change", e => e.matches && enableTouch());
+addEventListener("pointerdown", e => { if (e.pointerType === "touch") enableTouch(); }, true);
+addEventListener("touchstart", enableTouch, { capture: true, passive: true, once: true });
+const stick = $("stick"), knob = $("knob"), STICK_R = 50; // bán kính kéo tối đa của núm
+function moveKnob(e) {
+  const r = stick.getBoundingClientRect();
+  let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  const d = Math.hypot(dx, dy); if (d > STICK_R) { dx *= STICK_R / d; dy *= STICK_R / d; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+  joy.dx = dx / STICK_R; joy.dy = dy / STICK_R;
+}
+stick.addEventListener("pointerdown", e => {
+  e.preventDefault(); if (modalOpen()) return;
+  joy.active = true; joy.id = e.pointerId; stick.setPointerCapture(e.pointerId); moveKnob(e);
+});
+stick.addEventListener("pointermove", e => { if (joy.active && e.pointerId === joy.id) moveKnob(e); });
+const endJoy = e => { if (e.pointerId !== joy.id) return; joy.active = false; joy.dx = joy.dy = 0; knob.style.transform = ""; };
+stick.addEventListener("pointerup", endJoy); stick.addEventListener("pointercancel", endJoy);
+$("actBtn").addEventListener("click", () => nearStall && openStall(nearStall));
+let actFor; // gian mà nút đang hiển thị, để chỉ cập nhật DOM khi đổi
+function updateActBtn() {
+  const closed = nearStall && isClosed(nearStall), key = nearStall ? STALLS.indexOf(nearStall) + (closed ? 100 : 0) : -1;
+  if (actFor === key) return; actFor = key;
+  const b = $("actBtn"); b.disabled = !nearStall || closed; b.classList.toggle("ready", !!nearStall && !closed);
+  b.querySelector(".ico").textContent = nearStall ? (closed ? "🔒" : nearStall.icon) : "🏪";
+  b.querySelector(".lbl").textContent = nearStall ? (closed ? "Đã đóng cửa" : `Vào ${nearStall.name}`) : "Vào gian";
+}
+
+// ===== Update =====
+let nearStall = null;
+// Camera: đích là nhân vật (cộng một khoảng nhìn trước theo hướng đang đi), camera tiến dần về đích
+// theo hàm mũ nên mượt ở mọi tốc độ khung hình. snap = true để nhảy thẳng tới đích (lúc mới vào game).
+const CAM_FOLLOW = 0.1, CAM_LOOKAHEAD = 60;
+let lookX = 0, lookY = 0;
+function updateCamera(dt, snap = false) {
+  const vx = player.x - (player.px ?? player.x), vy = player.y - (player.py ?? player.y);
+  player.px = player.x; player.py = player.y;
+  const k = snap ? 1 : 1 - Math.pow(1 - CAM_FOLLOW, dt);
+  const sp = Math.hypot(vx, vy);
+  lookX += ((sp > 0.1 ? vx / sp * CAM_LOOKAHEAD : 0) - lookX) * k * 0.5;
+  lookY += ((sp > 0.1 ? vy / sp * CAM_LOOKAHEAD * 0.6 : 0) - lookY) * k * 0.5;
+  const clamp = (v, size, world) => size >= world ? (world - size) / 2 : Math.max(0, Math.min(v, world - size));
+  const tx = clamp(player.x + lookX - cam.w / 2, cam.w, WORLD.w), ty = clamp(player.y + lookY - cam.h / 2, cam.h, WORLD.h);
+  cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
+  if (Math.abs(tx - cam.x) < 0.05) cam.x = tx;
+  if (Math.abs(ty - cam.y) < 0.05) cam.y = ty;
+}
+function update(dt) {
+  updateScene(dt);
+  updateAudio(dt);
+  updateNet(dt);
+  if (!modalOpen()) {
+    let dx = (keys.d || keys.arrowright ? 1 : 0) - (keys.a || keys.arrowleft ? 1 : 0);
+    let dy = (keys.s || keys.arrowdown ? 1 : 0) - (keys.w || keys.arrowup ? 1 : 0);
+    let speed = 3.2;
+    const jm = Math.hypot(joy.dx, joy.dy);
+    if (!dx && !dy && joy.active && jm > 0.15) { dx = joy.dx; dy = joy.dy; speed = 3.2 * Math.min(1, jm * 1.2); } // nghiêng nhẹ thì đi chậm
+    if (dx || dy) {
+      player.target = null; player.pendingStall = null;
+      const l = Math.hypot(dx, dy); tryMove(player, dx / l * speed * dt, dy / l * speed * dt);
+    } else if (player.target) {
+      if (moveToward(player, 3.2, dt) && player.pendingStall) { openStall(player.pendingStall); player.pendingStall = null; }
+    } else player.moving = false;
+  }
+  for (const n of npcs) {
+    if (n.hidden) continue;
+    if (n.wait > 0) { n.wait -= dt; n.moving = false; continue; }
+    if (!n.target) {
+      // NPC đi dạo: ghé trước một gian ngẫu nhiên hoặc một điểm trên đường
+      const s = STALLS[Math.random() * STALLS.length | 0];
+      n.target = Math.random() < 0.6
+        ? { x: s.zone.x + Math.random() * s.zone.w, y: s.zone.y + 20 + Math.random() * 30 }
+        : (x => ({ x, y: (centerAt(x / 48) + 0.5) * 48 + (Math.random() - 0.5) * 60 }))(40 + Math.random() * (WORLD.w - 80));
+    }
+    if (moveToward(n, 1.4, dt)) n.wait = 60 + Math.random() * 180 | 0;
+  }
+  updatePet(dt);
+  const prevStall = nearStall;
+  nearStall = STALLS.find(s => inRect(player.x, player.y, s.zone)) || null;
+  const t = performance.now() / 1000;
+  for (const k of keepers) {
+    const d = Math.hypot(player.x - k.x, player.y - k.y);
+    if (d < 260) k.dir = player.x >= k.x ? 1 : -1; // quay mặt về phía khách
+    if (k.bubble && t > k.bubble.until) k.bubble = null;
+    if (nearStall === k.stall && prevStall !== k.stall) {
+      if (isClosed(k.stall)) say(k, "Tiệm đóng cửa rồi, mai ghé nha!", 3.5, t);
+      else { say(k, `${player.name} ơi! ${pick(greetPool(k))}`, 3.5, t); k.hopUntil = t + 0.6; }
+    }
+    else if (!k.bubble && t > k.nextAd && d < 520 && !isClosed(k.stall)) { say(k, pick(adPool(k)), 3, t); k.nextAd = t + 9 + Math.random() * 10; }
+  }
+  const hint = $("hint");
+  if (nearStall && !modalOpen()) { hint.style.display = "block"; hint.textContent = isClosed(nearStall) ? `🔒 Gian ${nearStall.name} đã đóng cửa, mai ghé nha` : `${nearStall.icon} Nhấn E (hoặc chạm vào đây) để vào gian ${nearStall.name}`; }
+  else hint.style.display = "none";
+  updateActBtn();
+
+  updateCamera(dt);
+}
+
+// ===== Vẽ =====
+let groundCv;
+function buildGround() {
+  groundCv = document.createElement("canvas"); groundCv.width = WORLD.w; groundCv.height = WORLD.h;
+  const g = groundCv.getContext("2d"); g.imageSmoothingEnabled = false;
+  const C = WORLD.w / T, R = WORLD.h / T;
+  let seed = 7; const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647; // map cố định mỗi lần tải
+  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) { const v = rnd(); tile(v < 0.8 ? 1 : v < 0.93 ? 0 : 2, 0, c * T, r * T, g); }
+
+  // Đường đất quê: mỗi cột có một tâm đường uốn theo 2 sóng sin, đường rộng ~3 ô
+  const dirt = Array.from({ length: R }, () => Array(C).fill(false));
+  const set = (r, c) => { if (r >= 0 && r < R && c >= 0 && c < C) dirt[r][c] = true; };
+  for (let c = 0; c < C; c++) {
+    const y = centerAt(c);
+    for (let r = Math.round(y - 1.3); r <= Math.round(y + 1.3); r++) set(r, c);
+  }
+  // Lối mòn rẽ từ đường chính vào trước mỗi gian hàng (rộng 2 ô)
+  STALLS.forEach(st => {
+    const c0 = Math.round((st.x + st.w / 2) / T) - 1;
+    const edge = Math.floor((st.top ? st.y + st.h : st.y) / T);
+    for (const c of [c0, c0 + 1]) {
+      const y = Math.round(centerAt(c));
+      if (st.top) for (let r = edge; r <= y; r++) set(r, c);
+      else for (let r = y; r <= edge; r++) set(r, c);
+    }
+  });
+  // Ô ở viền đường lấy góc/cạnh theo 4 ô hàng xóm; ngoài mép bản đồ coi như vẫn là đất
+  const isDirt = (r, c) => r < 0 || r >= R || c < 0 || c >= C || dirt[r][c];
+  for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
+    if (!dirt[r][c]) continue;
+    const n = isDirt(r - 1, c), so = isDirt(r + 1, c), w = isDirt(r, c - 1), e = isDirt(r, c + 1);
+    const tc = !w && e ? 0 : !e && w ? 2 : 1, tr = !n && so ? 1 : !so && n ? 3 : 2;
+    tile(tc, tr, c * T, r * T, g);
+  }
+  // bụi cây, nấm lác đác trên bãi cỏ (không mọc trên đường)
+  for (let i = 0; i < 45; i++) {
+    const c = rnd() * C | 0, r = rnd() * R | 0;
+    if (dirt[r][c] || SOLIDS.some(o => c * T < o.x + o.w + 8 && c * T + T > o.x - 8 && r * T < o.y + o.h + 8 && r * T + T > o.y - 8)) continue;
+    tile(rnd() < 0.6 ? 5 : 4, rnd() < 0.6 ? 0 : 2, c * T, r * T, g);
+  }
+  themeGround(g, dirt, rnd);
+}
+function drawGate() {
+  ctx.fillStyle = "#b71c1c"; ctx.fillRect(20, ROAD.y - 30, 16, ROAD.h + 30); ctx.fillRect(20, ROAD.y + ROAD.h - 10, 16, 10);
+  ctx.fillRect(20, ROAD.y - 40, 80, 24);
+  ctx.fillStyle = "#ffd54f"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("CHỢ", 44, ROAD.y - 23);
+}
+// ===== Ngày/đêm theo giờ Việt Nam + theme (người chơi tự chọn) =====
+const THEMES = {
+  default: { name: "Mặc định", icon: "🏮", desc: "Chợ quê thường ngày" },
+  tet: { name: "Tết", icon: "🧧", desc: "Mai đào, đèn lồng đỏ, hoa rơi", particles: "petals", strings: "tet",
+    greet: ["Chúc mừng năm mới, phát tài phát lộc nha!", "Xuân sang, mua sắm Tết thôi!"],
+    ads: ["Năm mới giảm giá đầu năm nè!", "Lì xì may mắn cho khách đầu năm!"],
+    lights: (t, add) => stringLights(add, "255,120,70"), stallDeco: (s, t) => tetDeco(s) },
+  trungthu: { name: "Trung thu", icon: "🥮", desc: "Đèn ông sao, lồng đèn lấp lánh", particles: "sparkle", strings: "trungthu",
+    greet: ["Trung thu vui vẻ nha con!", "Rước đèn phá cỗ, ghé xem nè!"],
+    ads: ["Bánh trung thu mới ra lò đây!", "Đèn ông sao đẹp lắm nè!"],
+    lights: (t, add) => { stringLights(add, "255,215,120"); STALLS.forEach(s => [s.x + 4, s.x + s.w - 4].forEach(x => add(x, s.y + 76, 55, "255,215,120", .9))); },
+    stallDeco: (s, t) => trungThuDeco(s, t) },
+  noel: { name: "Noel", icon: "🎄", desc: "Tuyết rơi, cây thông, mũ ông già", particles: "snow", strings: "noel", hat: true,
+    ground: { rgb: "255,255,255", a: .5 }, decor: "xmas",
+    greet: ["Giáng sinh vui vẻ nha!", "Ho ho ho, quà Noel đây!"],
+    ads: ["Quà Noel giảm giá nè!", "Mua quà tặng người thương nào!"],
+    lights: (t, add) => { stringLights(add, "255,200,160"); decorPositions().forEach(([x, y]) => add(x, y - 40, 80, "255,210,150", 1)); },
+    stallDeco: (s, t) => noelDeco(s), stallTop: s => noelTop(s) },
+  mua: { name: "Mùa mưa", icon: "🌧️", desc: "Mưa rơi, vũng nước, có sấm", particles: "rain", thunder: true,
+    ground: { rgb: "70,95,130", a: .28 }, amb: { r: 70, g: 85, b: 110, a: .26 },
+    greet: ["Mưa rồi, vào trú mua đồ nè!", "Trời mưa, ghé quán cho ấm nha!"],
+    ads: ["Mưa lạnh, uống ly nước ấm nè!", "Có áo mưa cho khách đây!"],
+    stallDeco: (s, t) => muaDeco(s, t) },
+};
+const EVENING_ADS = ["Chiều rồi, giảm giá cuối ngày nè!", "Sắp dọn hàng, mua nhanh kẻo hết!"];
+const NIGHT_ADS = ["Chợ đêm vui lắm, ghé chơi nè!", "Đêm nay đèn đẹp, mua gì không bạn?"];
+const SCENE_KEY = "cho.scene";
+const scene = (() => {
+  const d = { time: "auto", theme: "default" };
+  try { const p = JSON.parse(localStorage.getItem(SCENE_KEY)); if (p) { if (["auto", "day", "night"].includes(p.time)) d.time = p.time; if (p.theme in THEMES) d.theme = p.theme; } } catch {}
+  return d;
+})();
+const saveScene = () => { try { localStorage.setItem(SCENE_KEY, JSON.stringify(scene)); } catch {} };
+const theme = () => THEMES[scene.theme];
+
+// --- Giờ Việt Nam (UTC+7), làm mới mỗi 0,5 giây
+const vnFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ho_Chi_Minh", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+const vnCache = { at: -1e9, h: 12 };
+let hourOverride = null; // chỉ dùng khi thử nghiệm trong console
+function vnHour() {
+  const now = performance.now();
+  if (now - vnCache.at > 500) {
+    try { const p = Object.fromEntries(vnFmt.formatToParts(new Date()).map(x => [x.type, x.value])); vnCache.h = (+p.hour % 24) + p.minute / 60 + p.second / 3600; }
+    catch { const d = new Date(); vnCache.h = (d.getUTCHours() + 7) % 24 + d.getUTCMinutes() / 60; }
+    vnCache.at = now;
+  }
+  return vnCache.h;
+}
+const sceneHour = () => hourOverride ?? (scene.time === "day" ? 12 : scene.time === "night" ? 21 : vnHour());
+
+// --- Màu phủ toàn cảnh theo giờ: [giờ, r, g, b, độ đậm]
+const AMB_KEYS = [[0, 10, 14, 48, .62], [5, 20, 24, 70, .56], [6, 255, 160, 110, .26], [7, 255, 210, 160, .08], [8, 255, 255, 255, 0],
+  [15.5, 255, 255, 255, 0], [16.5, 255, 205, 120, .12], [17.7, 255, 140, 70, .28], [18.6, 70, 45, 115, .48], [20, 14, 18, 58, .6], [24, 10, 14, 48, .62]];
+function sampleAmb(h) {
+  for (let i = 1; i < AMB_KEYS.length; i++) {
+    const a = AMB_KEYS[i - 1], b = AMB_KEYS[i];
+    if (h <= b[0]) { const f = (h - a[0]) / (b[0] - a[0]); return { r: a[1] + (b[1] - a[1]) * f, g: a[2] + (b[2] - a[2]) * f, b: a[3] + (b[3] - a[3]) * f, a: a[4] + (b[4] - a[4]) * f }; }
+  }
+  const l = AMB_KEYS.at(-1); return { r: l[1], g: l[2], b: l[3], a: l[4] };
+}
+function targetAmb() { // chồng màu của theme (ví dụ mưa) lên màu theo giờ
+  const base = sampleAmb(sceneHour()), th = theme().amb;
+  if (!th) return base;
+  const a = base.a + th.a * (1 - base.a), w1 = a ? base.a / a : 0, w2 = 1 - w1;
+  return { r: base.r * w1 + th.r * w2, g: base.g * w1 + th.g * w2, b: base.b * w1 + th.b * w2, a };
+}
+const amb = { r: 255, g: 255, b: 255, a: 0 }; // màu đang hiển thị, trôi dần tới màu đích
+let lit = 0, closedLate = false, marketNightOn = false, flash = 0, nextThunder = 0, parts = [], flies = [], puddles = [];
+const isClosed = s => closedLate && !["food", "drinks"].includes(s.kind);
+const pad2 = n => String(n).padStart(2, "0");
+
+function updateScene(dt) {
+  const T = targetAmb(), k = 1 - Math.pow(0.94, dt);
+  for (const c of ["r", "g", "b", "a"]) amb[c] += (T[c] - amb[c]) * k;
+  lit = Math.max(0, Math.min(1, (amb.a - 0.14) / 0.34));
+  document.body.classList.toggle("night", lit > 0.5);
+  const h = sceneHour();
+  closedLate = scene.time === "auto" && (h >= 23 || h < 6); // khuya: chỉ còn gian ăn uống mở
+  marketNightOn = h >= 18 && h < 23;
+  npcs.forEach((n, i) => { n.hidden = closedLate && i % 2 === 1; });
+  const t = performance.now() / 1000;
+  for (const p of parts) {
+    const ty = theme().particles;
+    if (ty === "petals") { p.y += (.5 + p.s * .7) * dt; p.x += (Math.sin(t * 1.2 + p.ph) * .5 - .15) * dt; }
+    else if (ty === "snow") { p.y += (.4 + p.s * .9) * dt; p.x += Math.sin(t + p.ph) * .35 * dt; }
+    else if (ty === "rain") { p.y += (12 + p.s * 6) * dt; p.x -= 2.2 * dt; }
+    else if (ty === "sparkle") { p.y -= (.15 + p.s * .3) * dt; p.x += Math.sin(t + p.ph) * .2 * dt; }
+    if (p.y > cam.h + 10) { p.y = -10; p.x = Math.random() * cam.w; } else if (p.y < -10) { p.y = cam.h + 10; p.x = Math.random() * cam.w; }
+    if (p.x < -10) p.x = cam.w + 10; else if (p.x > cam.w + 10) p.x = -10;
+  }
+  for (const f of flies) { f.x += Math.cos(t * f.sp + f.ph) * .3 * dt; f.y += Math.sin(t * f.sp * 1.3 + f.ph) * .25 * dt; }
+  if (theme().thunder) { if (t > nextThunder) { flash = 1; nextThunder = t + 10 + Math.random() * 18; sfx("thunder"); } flash *= Math.pow(0.9, dt); } else flash = 0;
+  updateSceneBtn();
+}
+function initParticles() {
+  const n = { petals: 44, snow: 100, rain: 150, sparkle: 36 }[theme().particles] ?? 0;
+  parts = Array.from({ length: n }, () => ({ x: Math.random() * (cam.w || 800), y: Math.random() * (cam.h || 600), s: Math.random(), ph: Math.random() * 6.28 }));
+  nextThunder = performance.now() / 1000 + 6 + Math.random() * 8;
+}
+function initFlies() { // đom đóm bay ở rìa chợ
+  flies = Array.from({ length: 34 }, () => {
+    const r = Math.random(); let x, y;
+    if (r < .35) { x = Math.random() * 1440; y = 20 + Math.random() * 100; } else if (r < .7) { x = Math.random() * 1440; y = 850 + Math.random() * 130; }
+    else if (r < .85) { x = 10 + Math.random() * 100; y = Math.random() * 1008; } else { x = 1280 + Math.random() * 150; y = Math.random() * 1008; }
+    return { x, y, ph: Math.random() * 6.28, sp: .3 + Math.random() * .5 };
+  });
+}
+let btnState = "";
+function updateSceneBtn(force) {
+  const h = sceneHour(), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
+  const ic = theme().particles === "rain" ? "🌧️" : h >= 6 && h < 16 ? "☀️" : h >= 16 && h < 18.6 ? "🌇" : h >= 5 && h < 6 ? "🌅" : "🌙";
+  const txt = scene.time === "auto" ? `${pad2(hh)}:${pad2(mm)}` : scene.time === "day" ? "Ngày" : "Đêm";
+  const key = ic + txt; if (key === btnState && !force) return; btnState = key;
+  const b = $("sceneBtn"); if (!b) return;
+  b.querySelector(".ic").textContent = ic; b.querySelector(".t").textContent = txt;
+}
+
+// --- Lớp ánh sáng: canvas phụ độ phân giải thấp, tô màu tối rồi "khoét" các vùng sáng
+const lightCv = document.createElement("canvas"), lightG = lightCv.getContext("2d"), LS = 0.5;
+const GLOW = { clothes: "255,225,190", shoes: "255,215,160", accessories: "190,220,255", cosmetics: "255,190,225", food: "255,170,90", drinks: "170,235,230", fruit: "255,225,130", candy: "255,175,215" };
+function collectLights(t) {
+  const L = [], add = (x, y, r, col, i = 1) => L.push([x, y, r, col, i]);
+  STALLS.forEach(s => {
+    const g = GLOW[s.kind], cx = s.x + s.w / 2;
+    if (isClosed(s)) { add(cx, s.y - 18, 50, "255,230,170", .5); return; }
+    add(cx, s.y - 18, 85, g, 1);                                  // biển hiệu
+    add(cx, s.top ? s.y + s.h - 30 : s.y + 80, 130, g, .95);      // quầy hàng
+    add(s.x + 12, s.y + 50, 60, g, .8); add(s.x + s.w - 12, s.y + 50, 60, g, .8);
+  });
+  keepers.forEach(k => add(k.x, k.y - 24, 55, "255,220,170", .6));
+  npcs.forEach(n => { if (!n.hidden) add(n.x, n.y - 24, 42, "255,235,200", .45); });
+  remotes.forEach(r => add(r.x, r.y - 24, 70, "255,235,190", .8));
+  add(player.x, player.y - 24, 105, "255,235,190", 1);            // vòng sáng quanh người chơi
+  theme().lights?.(t, add);
+  return L;
+}
+function drawLighting(t) {
+  if (amb.a < 0.012) return;
+  const g = lightG, w = lightCv.width, h = lightCv.height;
+  g.globalCompositeOperation = "source-over"; g.clearRect(0, 0, w, h);
+  g.fillStyle = `rgba(${amb.r | 0},${amb.g | 0},${amb.b | 0},${amb.a})`; g.fillRect(0, 0, w, h);
+  const L = lit > 0.02 ? collectLights(t) : [];
+  g.globalCompositeOperation = "destination-out";
+  const vis = [];
+  for (const [x, y, r, col, i0] of L) {
+    const sx = (x - cam.x) * LS, sy = (y - cam.y) * LS, rr = r * LS;
+    if (sx + rr < 0 || sy + rr < 0 || sx - rr > w || sy - rr > h) continue;
+    const i = Math.min(1, i0 * lit * (1 + .05 * Math.sin(t * 9 + x)));
+    const gr = g.createRadialGradient(sx, sy, 0, sx, sy, rr);
+    gr.addColorStop(0, `rgba(0,0,0,${i})`); gr.addColorStop(.55, `rgba(0,0,0,${i * .55})`); gr.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = gr; g.fillRect(sx - rr, sy - rr, rr * 2, rr * 2);
+    vis.push([x, y, r, col, i]);
+  }
+  ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(lightCv, cam.x, cam.y, cam.w, cam.h);
+  ctx.globalCompositeOperation = "lighter"; // ánh sáng ấm cộng thêm
+  for (const [x, y, r, col, i] of vis) {
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, r * .7);
+    gr.addColorStop(0, `rgba(${col},${.22 * i})`); gr.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = gr; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  ctx.restore();
+}
+function drawFireflies(t) {
+  if (lit < .3 || theme().particles === "rain") return;
+  ctx.save(); ctx.globalCompositeOperation = "lighter";
+  for (const f of flies) {
+    const a = (.35 + .65 * Math.max(0, Math.sin(t * 2.2 + f.ph))) * lit;
+    const gr = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, 9);
+    gr.addColorStop(0, `rgba(210,255,120,${a})`); gr.addColorStop(1, "rgba(210,255,120,0)");
+    ctx.fillStyle = gr; ctx.fillRect(f.x - 9, f.y - 9, 18, 18);
+  }
+  ctx.restore();
+}
+
+// --- Hạt rơi theo theme (vẽ theo toạ độ màn hình) và tia chớp
+function drawParticles(t) {
+  if (flash > 0.02) { ctx.fillStyle = `rgba(255,255,255,${flash * .55})`; ctx.fillRect(0, 0, cam.w, cam.h); }
+  const ty = theme().particles; if (!ty) return;
+  if (ty === "rain") { ctx.strokeStyle = "rgba(200,225,255,.55)"; ctx.lineWidth = 1.2; ctx.beginPath(); for (const p of parts) { ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - 3, p.y + 13); } ctx.stroke(); return; }
+  if (ty === "snow") { ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.beginPath(); for (const p of parts) { ctx.moveTo(p.x, p.y); ctx.arc(p.x, p.y, 1.4 + p.s * 2, 0, 7); } ctx.fill(); return; }
+  if (ty === "petals") {
+    for (const p of parts) { ctx.fillStyle = p.s > .5 ? "#f8bbd0" : "#ffd54f"; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(t * 1.5 + p.ph); ctx.beginPath(); ctx.ellipse(0, 0, 4, 2.2, 0, 0, 7); ctx.fill(); ctx.restore(); }
+    return;
+  }
+  ctx.save(); ctx.globalCompositeOperation = "lighter"; // sparkle
+  for (const p of parts) { const a = .2 + .6 * (Math.sin(t * 3 + p.ph) + 1) / 2; ctx.fillStyle = `rgba(255,220,130,${a})`; const r = 1 + p.s * 2; ctx.fillRect(p.x - r * 2, p.y - .5, r * 4, 1); ctx.fillRect(p.x - .5, p.y - r * 2, 1, r * 4); }
+  ctx.restore();
+}
+function drawGroundFx(t) { // gợn nước trong các vũng (theme mưa)
+  for (const p of puddles) { const k = (t * .8 + p.ph) % 1; ctx.strokeStyle = `rgba(255,255,255,${.5 * (1 - k)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(p.x, p.y, p.w * (.3 + .7 * k), p.w * .35 * (.3 + .7 * k), 0, 0, 7); ctx.stroke(); }
+}
+function themeGround(g, dirt, rnd) {
+  puddles = [];
+  const th = theme();
+  if (th.ground) { g.save(); g.globalCompositeOperation = "source-atop"; g.fillStyle = `rgba(${th.ground.rgb},${th.ground.a})`; g.fillRect(0, 0, WORLD.w, WORLD.h); g.restore(); }
+  if (scene.theme === "noel") { g.fillStyle = "rgba(255,255,255,.85)"; for (let i = 0; i < 170; i++) { g.beginPath(); g.ellipse(rnd() * WORLD.w, rnd() * WORLD.h, 6 + rnd() * 9, 3 + rnd() * 4, 0, 0, 7); g.fill(); } }
+  if (scene.theme === "mua") {
+    const R = dirt.length, C = dirt[0].length;
+    for (let r = 0; r < R && puddles.length < 22; r++) for (let c = 0; c < C && puddles.length < 22; c++) if (dirt[r][c] && rnd() < .05) {
+      const x = c * T + T / 2, y = r * T + T / 2, w = 14 + rnd() * 10;
+      g.fillStyle = "rgba(95,135,190,.65)"; g.beginPath(); g.ellipse(x, y, w, w * .45, 0, 0, 7); g.fill();
+      g.fillStyle = "rgba(200,225,255,.5)"; g.beginPath(); g.ellipse(x - w * .25, y - w * .1, w * .4, w * .15, 0, 0, 7); g.fill();
+      puddles.push({ x, y, w, ph: rnd() });
+    }
+  }
+}
+
+// --- Đồ trang trí theo theme
+const DECOR_POS = [[395, 250], [685, 250], [975, 250], [395, 730], [685, 730], [975, 730], [80, 190], [80, 820], [1380, 300], [1380, 700]];
+const decorPositions = () => scene.theme === "noel" ? DECOR_POS.slice(0, 6) : scene.theme === "tet" ? DECOR_POS : [];
+function themeDecorItems(t) {
+  return decorPositions().map(([x, y], i) => ({ y, f: () => scene.theme === "noel" ? xmasTree(x, y, t, i) : blossomTree(x, y, i % 2 ? "#f48fb1" : "#ffca28", i % 2 ? "#fce4ec" : "#fff59d") }));
+}
+function blossomTree(x, y, c1, c2) {
+  ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(x, y + 10, 24, 7, 0, 0, 7); ctx.fill();
+  rect(x - 5, y - 18, 10, 28, "#6d4c41");
+  circ(x - 14, y - 36, 16, c1); circ(x + 14, y - 36, 16, c1); circ(x, y - 50, 20, c1);
+  ctx.fillStyle = c2; for (let i = 0; i < 18; i++) { const a = i * 2.4, r = 6 + (i * 7) % 24; ctx.fillRect(x + Math.cos(a) * r * 1.3 - 2, y - 42 + Math.sin(a) * r * .9 - 2, 4, 4); }
+}
+function starPath(cx, cy, r) { ctx.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rad = k % 2 ? r * .45 : r; ctx[k ? "lineTo" : "moveTo"](cx + Math.cos(a) * rad, cy + Math.sin(a) * rad); } ctx.closePath(); }
+function xmasTree(x, y, t, idx) {
+  ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(x, y + 10, 28, 8, 0, 0, 7); ctx.fill();
+  rect(x - 5, y - 6, 10, 16, "#6d4c41");
+  for (let k = 0; k < 3; k++) {
+    const w = 46 - k * 10, top = y - 22 - k * 22;
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.moveTo(x - w / 2 - 2, top + 24); ctx.lineTo(x + w / 2 + 2, top + 24); ctx.lineTo(x, top - 4); ctx.fill();
+    ctx.fillStyle = k % 2 ? "#388e3c" : "#2e7d32"; ctx.beginPath(); ctx.moveTo(x - w / 2, top + 22); ctx.lineTo(x + w / 2, top + 22); ctx.lineTo(x, top - 1); ctx.fill();
+  }
+  const cols = ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"];
+  for (let i = 0; i < 9; i++) { const on = (Math.floor(t * 2) + i + idx) % 2 === 0, yy = y - 10 - i * 7, xx = x + Math.sin(i * 1.9) * (20 - i * 1.6); ctx.fillStyle = on ? cols[i % 4] : "#37474f"; ctx.fillRect(xx - 2, yy - 2, 4, 4); }
+  starPath(x, y - 84, 8); ctx.fillStyle = "#ffd54f"; ctx.fill(); ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.stroke();
+  rect(x - 32, y + 2, 14, 12, "#e53935"); rect(x + 18, y + 4, 12, 10, "#1e88e5");
+}
+// Dây đèn giăng ngang đường (Tết: đèn lồng, Trung thu: đèn ông sao, Noel: bóng đèn nháy)
+const STRING_BASES = () => [ROAD.y + 4, ROAD.y + ROAD.h - 104]; // dây thứ hai nằm giữa đường, không che huy hiệu gian bên dưới
+const sag = x => 9 * Math.sin(((x - 110) % 145) / 145 * Math.PI);
+function drawStrings(t, kind) {
+  const STAR = ["#ffd54f", "#ef5350", "#66bb6a", "#42a5f5", "#ab47bc"], BULB = ["#ff5252", "#ffd740", "#40c4ff", "#69f0ae"];
+  for (const base of STRING_BASES()) {
+    ctx.strokeStyle = "#3e2723"; ctx.lineWidth = 2; ctx.beginPath();
+    for (let x = 110; x <= 1330; x += 6) ctx[x === 110 ? "moveTo" : "lineTo"](x, base + sag(x));
+    ctx.stroke();
+    for (let x = 134, i = 0; x <= 1310; x += 48, i++) {
+      const y = base + sag(x);
+      if (kind === "tet") lantern(x, y, t, i);
+      else if (kind === "trungthu") {
+        ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * 1.5 + i) * .08);
+        ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 10); ctx.stroke();
+        starPath(0, 22, 12); ctx.fillStyle = STAR[i % 5]; ctx.fill(); ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = "rgba(255,255,255,.75)"; ctx.beginPath(); ctx.arc(0, 22, 3, 0, 7); ctx.fill(); ctx.restore();
+      } else { circ(x, y + 8, 4, (Math.floor(t * 2) + i) % 2 ? BULB[i % 4] : "#607d8b"); }
+    }
+  }
+}
+function stringLights(add, col) {
+  for (const base of STRING_BASES()) for (let x = 134; x <= 1310; x += 96) add(x, base + sag(x) + 22, 70, col, .9);
+}
+function drawThemeOverlay(t) { const k = theme().strings; if (k) drawStrings(t, k); }
+// Trang trí riêng trên từng gian
+function tetDeco(s) { // câu đối đỏ hai bên gian
+  for (const sx of [s.x - 16, s.x + s.w + 4]) { rect(sx, s.y + 56, 12, 74, "#c62828"); ctx.fillStyle = "#ffd54f"; for (let i = 0; i < 4; i++) ctx.fillRect(sx + 3, s.y + 64 + i * 16, 6, 3); }
+}
+function trungThuDeco(s, t) {
+  [s.x + 4, s.x + s.w - 4].forEach((sx, i) => {
+    ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(sx, s.y + 50); ctx.lineTo(sx, s.y + 66); ctx.stroke();
+    starPath(sx, s.y + 78, 11); ctx.fillStyle = i ? "#ef5350" : "#ffd54f"; ctx.fill(); ctx.stroke();
+  });
+}
+function noelDeco(s) {
+  ctx.fillStyle = "#fff"; for (let i = -6; i < s.w + 6; i += 14) { ctx.beginPath(); ctx.ellipse(s.x + i, s.y - 1, 9, 5, 0, 0, 7); ctx.fill(); } // tuyết đọng trên mái
+}
+function noelTop(s) {
+  const cx = s.x + s.w / 2, by = s.y - 60; // mũ ông già Noel trên huy hiệu
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.moveTo(cx - 22, by + 4); ctx.lineTo(cx + 16, by + 2); ctx.lineTo(cx + 28, by - 24); ctx.fill();
+  ctx.fillStyle = "#e53935"; ctx.beginPath(); ctx.moveTo(cx - 19, by + 2); ctx.lineTo(cx + 13, by); ctx.lineTo(cx + 25, by - 21); ctx.fill();
+  rect(cx - 23, by - 1, 40, 7, "#fff"); circ(cx + 26, by - 24, 5, "#fff");
+}
+function muaDeco(s, t) { // bạt che mưa và nước nhỏ giọt từ mái
+  ctx.fillStyle = "rgba(60,110,170,.6)"; ctx.fillRect(s.x - 12, s.y - 8, s.w + 24, 16);
+  ctx.fillStyle = "rgba(255,255,255,.18)"; for (let i = 0; i < s.w + 24; i += 24) ctx.fillRect(s.x - 12 + i, s.y - 8, 12, 16);
+  ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.strokeRect(s.x - 12, s.y - 8, s.w + 24, 16);
+  ctx.fillStyle = "rgba(190,220,255,.9)"; for (let i = 0; i < 9; i++) { const k = (t * 1.6 + i * .37) % 1; ctx.fillRect(s.x + 8 + i * (s.w - 16) / 8, s.y + 52 + k * 26, 2, 5); }
+}
+function themeStallTop(s) {
+  theme().stallTop?.(s);
+  if (marketNightOn && !isClosed(s)) { // huy hiệu chợ đêm
+    const cx = s.x + s.w / 2; rect(cx + 30, s.y - 52, 74, 16, "#6a1b9a");
+    ctx.fillStyle = "#ffe082"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("✨ CHỢ ĐÊM", cx + 67, s.y - 43);
+  }
+}
+function drawShutter(s) { // khuya: gian đóng cửa, kéo cửa cuốn
+  const top = s.y + 54, hh = s.h - 54;
+  clipTo(s.x, top, s.w, hh, () => { ctx.fillStyle = "#6c747c"; ctx.fillRect(s.x, top, s.w, hh); ctx.fillStyle = "rgba(0,0,0,.18)"; for (let y = top + 6; y < top + hh; y += 8) ctx.fillRect(s.x, y, s.w, 2); });
+  ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.strokeRect(s.x, top, s.w, hh);
+  rect(s.x + s.w / 2 - 40, top + hh / 2 - 10, 80, 20, "#b71c1c");
+  ctx.fillStyle = "#fff"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("ĐÓNG CỬA", s.x + s.w / 2, top + hh / 2 + 1);
+}
+function drawHat(c, hop) { // mũ ông già Noel trên đầu nhân vật
+  const hx = c.x, top = c.y - 46 - hop + 7, d = c.dir > 0 ? 1 : -1;
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.moveTo(hx - 14, top + 5); ctx.lineTo(hx + 14, top + 5); ctx.lineTo(hx + d * 16, top - 13); ctx.fill();
+  ctx.fillStyle = "#e53935"; ctx.beginPath(); ctx.moveTo(hx - 12, top + 3); ctx.lineTo(hx + 12, top + 3); ctx.lineTo(hx + d * 14, top - 11); ctx.fill();
+  rect(hx - 13, top + 1, 26, 6, "#fff"); circ(hx + d * 15, top - 12, 4, "#fff");
+}
+const greetPool = k => { const g = theme().greet; return g && Math.random() < .5 ? g : k.greet; };
+function adPool(k) {
+  const h = sceneHour(), p = k.ads.slice(), th = theme();
+  if (th.ads) p.push(...th.ads, ...th.ads);
+  if (h >= 16 && h < 18) p.push(...EVENING_ADS, ...EVENING_ADS); else if (h >= 18 && h < 23) p.push(...NIGHT_ADS, ...NIGHT_ADS);
+  return p;
+}
+// Bảng chọn cảnh chợ (ngày/đêm + theme)
+function openSettings() {
+  view = null; $("mtitle").textContent = "Cảnh chợ"; $("mhead").style.background = "#37474f";
+  $("grid").style.cssText = "grid-template-columns:1fr"; renderSettings(); showModal();
+  for (const k in keys) keys[k] = false;
+}
+function renderSettings() {
+  const h = sceneHour(), clock = `${pad2(Math.floor(h))}:${pad2(Math.floor((h % 1) * 60))}`;
+  const opt = (kind, v, on, ic, name, sub) => `<button class="cz-opt ${on ? "on" : ""}" data-sc="${kind}" data-v="${v}" aria-pressed="${on}"><span class="ic">${ic}</span>${name}<small>${sub}</small></button>`;
+  $("grid").innerHTML = `<div class="cz-panel">
+    <div class="cz-field"><span class="cz-lb">Thời gian <em>Giờ Việt Nam ${clock}</em></span>
+      <div class="cz-opts" style="grid-template-columns:repeat(3,1fr)">${opt("time", "auto", scene.time === "auto", "🔄", "Tự động", "Theo giờ thật")}${opt("time", "day", scene.time === "day", "☀️", "Luôn ngày", "Sáng rõ")}${opt("time", "night", scene.time === "night", "🌙", "Luôn đêm", "Chợ đêm")}</div></div>
+    <div class="cz-field"><span class="cz-lb">Theme <em>Chỉ đổi khi bạn chọn</em></span>
+      <div class="cz-opts" style="grid-template-columns:repeat(2,1fr)">${Object.entries(THEMES).map(([id, th]) => opt("theme", id, scene.theme === id, th.icon, th.name, th.desc)).join("").replace(/<button class="cz-opt([^>]*)>(?![\s\S]*<button class="cz-opt)/, (m, r) => `<button style="grid-column:1/-1" class="cz-opt${r}>`)}</div></div>
+    <div class="cz-field"><span class="cz-lb">Âm thanh <em id="volTxt">${Math.round(aud.vol * 100)}%</em></span>
+      <div class="cz-opts" style="grid-template-columns:repeat(4,1fr)">${opt("snd", "on", aud.on, aud.on ? "🔊" : "🔇", "Tất cả", aud.on ? "Đang bật" : "Đang tắt")}${opt("snd", "music", aud.music, "🎵", "Nhạc nền", aud.music ? "Bật" : "Tắt")}${opt("snd", "sfx", aud.sfx, "👣", "Hiệu ứng", aud.sfx ? "Bật" : "Tắt")}${opt("snd", "amb", aud.amb, "🌿", "Tiếng chợ", aud.amb ? "Bật" : "Tắt")}</div>
+      <input id="vol" type="range" min="0" max="100" value="${Math.round(aud.vol * 100)}" aria-label="Âm lượng"></div>
+    <div class="cz-field"><span class="cz-lb">Chơi cùng mọi người <em>${netStatusText()}</em></span>
+      <div class="cz-opts" style="grid-template-columns:1fr">${opt("net", "on", netCfg.on, "🌐", "Hiện người chơi khác", netCfg.on ? "Gửi tên, vị trí và tin nhắn của bạn lên máy chủ công cộng" : "Đang tắt: bạn chơi một mình")}</div></div>
+    <p class="cz-hint">Tự động: sáng 6h–16h, chiều 16h–18h, chợ đêm 18h–23h, khuya 23h–6h một số gian đóng cửa.</p>
+    <button class="cz-done" data-sc="done">Xong</button></div>`;
+}
+$("grid").addEventListener("click", e => {
+  const b = e.target.closest("[data-sc]"); if (!b) return;
+  const { sc, v } = b.dataset;
+  if (sc === "done") return closeStall();
+  if (sc === "net") { netCfg.on = !netCfg.on; saveNet(); netCfg.on ? netStart() : netStop(); renderSettings(); return; }
+  if (sc === "snd") { aud[v] = !aud[v]; saveAudio(); audioInit(); applyAudio(); renderSettings(); return; }
+  if (sc === "time") scene.time = v;
+  else if (sc === "theme" && v !== scene.theme) { scene.theme = v; buildGround(); initParticles(); document.body.dataset.theme = v; updateSceneBtn(true); }
+  saveScene(); updateSceneBtn(true); renderSettings();
+});
+$("sceneBtn").onclick = openSettings;
+
+// ===== Âm thanh: tổng hợp bằng Web Audio, không cần file âm thanh =====
+const AUD_KEY = "cho.audio";
+const aud = (() => {
+  const d = { on: true, music: true, sfx: true, amb: true, vol: .7 };
+  try { const p = JSON.parse(localStorage.getItem(AUD_KEY)); if (p) { for (const k of ["on", "music", "sfx", "amb"]) if (typeof p[k] === "boolean") d[k] = p[k]; if (p.vol >= 0 && p.vol <= 1) d.vol = p.vol; } } catch {}
+  return d;
+})();
+const saveAudio = () => { try { localStorage.setItem(AUD_KEY, JSON.stringify(aud)); } catch {} };
+const A = { ctx: null, master: null, music: null, sfx: null, amb: null, noise: null, lastStep: 0, nextBird: 0, mNext: 0, mStep: 0, mIdx: 4 };
+
+function buildAudio(ctx) {
+  A.ctx = ctx;
+  // Bộ chặn đỉnh mềm (tanh): âm nhỏ giữ nguyên, chỉ bo tròn khi âm quá to để không bị vỡ tiếng
+  const comp = ctx.createWaveShaper(), curve = new Float32Array(1024);
+  for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(x * 1.5) / 1.5; }
+  comp.curve = curve; comp.connect(ctx.destination);
+  A.master = ctx.createGain(); A.master.connect(comp);
+  A.music = ctx.createGain(); A.sfx = ctx.createGain(); A.amb = ctx.createGain();
+  [A.music, A.sfx, A.amb].forEach(g => g.connect(A.master));
+  const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  A.noise = buf;
+  applyAudio(true);
+  // Vòng tiếng ồn có lọc (mưa, gió, tiếng chợ). Mỗi vòng có một nấc gain riêng do updateAudio điều khiển.
+  const loop = (type, freq, q, rate = 0, depth = 0) => {
+    const s = ctx.createBufferSource(); s.buffer = buf; s.loop = true;
+    const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const mod = ctx.createGain(), lvl = ctx.createGain(); lvl.gain.value = 0;
+    s.connect(f); f.connect(mod); mod.connect(lvl); lvl.connect(A.amb); s.start(Math.random());
+    if (rate) { const o = ctx.createOscillator(); o.frequency.value = rate; const dg = ctx.createGain(); dg.gain.value = depth; o.connect(dg); dg.connect(mod.gain); o.start(); }
+    return lvl;
+  };
+  A.rain = loop("bandpass", 3200, .5);
+  A.wind = loop("lowpass", 450, .7, .13, .5);
+  A.murmur = loop("bandpass", 380, .9, .21, .3);
+  // Dế kêu ban đêm: sóng mang cao tần được điều biên theo nhịp
+  const car = ctx.createOscillator(); car.frequency.value = 4300;
+  const am = ctx.createGain(); am.gain.value = .5; A.cricket = ctx.createGain(); A.cricket.gain.value = 0;
+  const lf = ctx.createOscillator(); lf.type = "square"; lf.frequency.value = 5.3; const ld = ctx.createGain(); ld.gain.value = .5;
+  lf.connect(ld); ld.connect(am.gain); car.connect(am); am.connect(A.cricket); A.cricket.connect(A.amb); car.start(); lf.start();
+}
+function applyAudio(snap) {
+  updateSoundBtn();
+  if (!A.ctx) return;
+  const t = A.ctx.currentTime, k = snap ? .001 : .05;
+  A.master.gain.setTargetAtTime(aud.on ? aud.vol : 0, t, k);
+  A.music.gain.setTargetAtTime(aud.music ? .8 : 0, t, .1);
+  A.sfx.gain.setTargetAtTime(aud.sfx ? 1 : 0, t, .05);
+  A.amb.gain.setTargetAtTime(aud.amb ? 1 : 0, t, .3);
+  if (snap) return;
+  if (aud.on) { if (A.ctx.state !== "running" && !document.hidden) A.ctx.resume?.(); silentPlay(true); }
+  else { silentPlay(false); setTimeout(() => { if (!aud.on && A.ctx.state === "running") A.ctx.suspend?.(); }, 400); } // tắt hẳn thì ngừng xử lý âm thanh cho đỡ tốn pin
+}
+function updateSoundBtn() { const b = $("soundBtn"); if (b) { b.textContent = aud.on ? "🔊" : "🔇"; b.setAttribute("aria-pressed", aud.on); } }
+// --- iPhone/iPad: công tắc rung/im lặng bên hông máy mặc định tắt tiếng Web Audio.
+// Đưa phiên âm thanh sang kiểu "playback" (như video/nhạc) và giữ một đoạn audio im lặng đang phát thì tiếng mới ra.
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function silentWavUri() {
+  const n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer), w = (o, t) => [...t].forEach((c, i) => b[o + i] = c.charCodeAt(0));
+  w(0, "RIFF"); v.setUint32(4, 36 + n, true); w(8, "WAVE"); w(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, "data"); v.setUint32(40, n, true); b.fill(128, 44);
+  return "data:audio/wav;base64," + btoa(String.fromCharCode(...b));
+}
+function silentPlay(on) {
+  if (!IS_IOS) return;
+  try {
+    if (navigator.audioSession) navigator.audioSession.type = "playback";
+    if (!A.silent) { const a = document.createElement("audio"); a.setAttribute("playsinline", ""); a.loop = true; a.src = silentWavUri(); A.silent = a; }
+    if (on) A.silent.play?.().catch(() => {}); else A.silent.pause();
+  } catch {}
+}
+function updateAudioHint() { // nhắc người chơi chạm màn hình nếu trình duyệt đang chặn âm thanh
+  const h = $("audioHint"); if (h) h.hidden = !(aud.on && (!A.ctx || A.ctx.state !== "running"));
+}
+function audioInit() {
+  if (!A.ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    try { buildAudio(new AC()); A.ctx.onstatechange = updateAudioHint; A.timer = setInterval(() => musicTick(), 150); } catch { return; }
+  }
+  if (aud.on && A.ctx.state !== "running" && !document.hidden) A.ctx.resume?.().then?.(updateAudioHint, () => {});
+  updateAudioHint();
+}
+// Mở khoá âm thanh: iOS chỉ chấp nhận trong lúc chạm xong (touchend/click), nên nghe cả các sự kiện này
+function audioUnlock() {
+  audioInit(); if (!A.ctx) return;
+  if (aud.on) silentPlay(true);
+  if (!A.unlocked && A.ctx.state === "running") { // phát một mẫu im lặng để iOS xác nhận
+    try { const s = A.ctx.createBufferSource(); s.buffer = A.ctx.createBuffer(1, 1, 22050); s.connect(A.ctx.destination); s.start(0); A.unlocked = true; } catch {}
+  }
+}
+["pointerdown", "pointerup", "touchstart", "touchend", "click", "keydown"].forEach(ev => addEventListener(ev, audioUnlock, { capture: true, passive: true }));
+document.addEventListener("visibilitychange", () => {
+  if (!A.ctx) return;
+  if (document.hidden) { A.ctx.suspend?.(); A.silent?.pause(); }
+  else if (aud.on) { A.ctx.resume?.(); silentPlay(true); }
+});
+updateAudioHint();
+
+// --- Giọng nói cơ bản: một nốt (tone) và một đợt tiếng ồn (noise) có bao biên độ
+function tone(f, t0, dur, o = {}) {
+  const c = A.ctx, osc = c.createOscillator(), g = c.createGain();
+  osc.type = o.type || "sine"; osc.frequency.setValueAtTime(f, t0);
+  if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t0 + dur);
+  g.gain.setValueAtTime(.0001, t0); g.gain.linearRampToValueAtTime(o.gain ?? .1, t0 + (o.attack ?? .004)); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+  osc.connect(g); g.connect(o.bus || A.sfx); osc.start(t0); osc.stop(t0 + dur + .05);
+}
+function noise(t0, dur, o = {}) {
+  const c = A.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = A.noise; s.loop = true; f.type = o.type || "bandpass"; f.frequency.value = o.freq || 1000; f.Q.value = o.q || 1;
+  g.gain.setValueAtTime(.0001, t0); g.gain.linearRampToValueAtTime(o.gain ?? .1, t0 + (o.attack ?? .005)); g.gain.exponentialRampToValueAtTime(.0001, t0 + dur);
+  s.connect(f); f.connect(g); g.connect(o.bus || A.sfx); s.start(t0, Math.random() * 1.5); s.stop(t0 + dur + .05);
+}
+// --- Hiệu ứng
+const SFX = {
+  step: t => { noise(t, .06, { freq: 420 + Math.random() * 260, q: .9, gain: .13 }); tone(90 + Math.random() * 20, t, .05, { gain: .05 }); },
+  tick: t => tone(1250, t, .035, { type: "triangle", gain: .06 }),
+  pop: t => tone(520, t, .07, { gain: .09, to: 880 }),
+  enter: t => { [[1319, 0], [1760, .09]].forEach(([f, d]) => { tone(f, t + d, .7, { gain: .12 }); tone(f * 2, t + d, .35, { gain: .04 }); }); noise(t, .08, { type: "highpass", freq: 3000, gain: .03 }); },
+  close: t => tone(660, t, .14, { type: "triangle", gain: .08, to: 420 }),
+  denied: t => { tone(150, t, .16, { type: "sawtooth", gain: .06 }); tone(130, t + .17, .2, { type: "sawtooth", gain: .06 }); },
+  sparkle: t => [1047, 1319, 1568, 2093, 2637].forEach((f, i) => tone(f, t + i * .05, .25, { gain: .06 })),
+  chime: t => [784, 988, 1319].forEach((f, i) => { tone(f, t + i * .12, .9, { gain: .08 }); tone(f * 2.01, t + i * .12, .4, { gain: .025 }); }),
+  thunder: t => { noise(t + .35, 2.6, { type: "lowpass", freq: 260, q: .7, gain: 1.2, attack: .08 }); noise(t + 1.2, 2.2, { type: "lowpass", freq: 180, q: .7, gain: .8, attack: .2 }); },
+  talk: (t, idx, vol) => { const base = 260 + idx * 38, n = 3 + (Math.random() * 3 | 0); for (let i = 0; i < n; i++) tone(base * [1, 1.26, 1.5, 1.19, 1.68][Math.random() * 5 | 0], t + i * .06, .07, { type: "triangle", gain: .07 * vol }); },
+};
+function sfx(name, ...args) { if (!A.ctx || !aud.on || !aud.sfx || A.ctx.state === "closed") return; try { SFX[name](A.ctx.currentTime, ...args); } catch {} }
+function chirp() { // chim hót ban ngày
+  const t = A.ctx.currentTime, f = 2600 + Math.random() * 1800, n = 2 + (Math.random() * 3 | 0);
+  for (let i = 0; i < n; i++) tone(f * (1 + i * .08), t + i * .11, .08, { gain: .035, to: f * (1.3 + Math.random() * .3), bus: A.amb });
+}
+// --- Mỗi khung hình: bước chân và độ lớn các tiếng môi trường theo giờ và theme
+function updateAudio(dt) {
+  const st = Math.floor(player.walk);
+  if (player.moving && !modalOpen() && st !== A.lastStep && st % 2 === 1) sfx("step");
+  A.lastStep = st;
+  if (!A.ctx) return;
+  const now = A.ctx.currentTime, th = scene.theme, rain = th === "mua", set = (g, v) => g.gain.setTargetAtTime(v, now, .6);
+  set(A.rain, rain ? .3 : 0);
+  set(A.wind, th === "noel" ? .35 : rain ? .12 : lit > .5 ? .05 : 0);
+  set(A.murmur, closedLate ? .05 : (.3 - .15 * lit) * (modalOpen() ? .6 : 1));
+  set(A.cricket, !rain && lit > .4 ? .08 * lit : 0);
+  const t = performance.now() / 1000;
+  if (!rain && lit < .3 && aud.on && aud.amb && A.ctx.state === "running" && t > A.nextBird) { chirp(); A.nextBird = t + 2 + Math.random() * 5; }
+}
+// --- Nhạc nền tự sinh: hợp âm nền + bass + giai điệu ngũ cung, mỗi theme một giọng riêng
+const SCALE = { major: [0, 2, 4, 7, 9], minor: [0, 3, 5, 7, 10] };
+const MUSIC = {
+  default: { root: 60, sc: "major", bpm: 92, wave: "triangle", p: .55, bell: false, prog: [0, 3, 1, 4] },
+  tet: { root: 62, sc: "major", bpm: 112, wave: "triangle", p: .65, bell: true, prog: [0, 2, 3, 1] },
+  trungthu: { root: 57, sc: "minor", bpm: 78, wave: "sine", p: .5, bell: true, prog: [0, 3, 2, 4] },
+  noel: { root: 60, sc: "major", bpm: 104, wave: "sine", p: .6, bell: true, sleigh: true, prog: [0, 3, 0, 4] },
+  mua: { root: 57, sc: "minor", bpm: 64, wave: "sine", p: .3, bell: false, prog: [0, 3, 1, 4] },
+};
+const mtoF = m => 440 * Math.pow(2, (m - 69) / 12);
+function musicTick(force = false, ahead = .5) {
+  if (!A.ctx || !aud.on || !aud.music || (A.ctx.state !== "running" && !force)) { A.mNext = 0; return; }
+  const c = A.ctx, cfg = MUSIC[scene.theme], sc = SCALE[cfg.sc], bus = A.music;
+  if (A.mNext < c.currentTime) A.mNext = c.currentTime + .1;
+  while (A.mNext < c.currentTime + ahead) {
+    const step = 60 / (cfg.bpm * (1 - .18 * lit)) / 2, i = A.mStep, t = A.mNext;
+    const chord = cfg.root + sc[cfg.prog[(i / 8 | 0) % 4] % 5];
+    if (i % 8 === 0) [0, 7, 12].forEach(iv => tone(mtoF(chord + iv), t, step * 8, { gain: .035, attack: .35, bus }));
+    if (i % 4 === 0) tone(mtoF(chord - 24), t, step * 3, { type: "triangle", gain: .09, bus });
+    if (Math.random() < cfg.p * (1 - .4 * lit)) {
+      A.mIdx = Math.max(0, Math.min(9, A.mIdx + [-2, -1, -1, 0, 1, 1, 2][Math.random() * 7 | 0]));
+      const note = cfg.root + 12 + sc[A.mIdx % 5] + 12 * (A.mIdx / 5 | 0);
+      tone(mtoF(note), t, step * 2.2, { type: cfg.wave, gain: .075, attack: .006, bus });
+      if (cfg.bell) tone(mtoF(note + 12), t, step * 1.5, { gain: .025, bus });
+    }
+    if (cfg.sleigh && i % 2 === 0) noise(t, .05, { type: "highpass", freq: 6500, gain: .03, bus });
+    A.mNext += step; A.mStep++;
+  }
+}
+// Nút bật/tắt âm thanh và tiếng bấm trong các bảng
+$("soundBtn").onclick = () => { audioUnlock(); aud.on = !aud.on; saveAudio(); applyAudio(); if (aud.on) sfx("tick"); };
+$("modal").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b || b.id === "mclose" || b.dataset.cz === "done" || b.dataset.sc === "done") return;
+  if (b.dataset.sc === "theme" && b.dataset.v !== scene.theme) sfx("chime");
+  else if (b.dataset.cz === "rnd") sfx("sparkle");
+  else if (b.dataset.act || b.dataset.cz === "part") sfx("pop");
+  else sfx("tick");
+}, true);
+$("grid").addEventListener("input", e => {
+  if (e.target.id !== "vol") return;
+  aud.vol = e.target.value / 100; saveAudio(); applyAudio(); $("volTxt").textContent = Math.round(aud.vol * 100) + "%";
+});
+$("grid").addEventListener("change", e => { if (e.target.id === "vol") sfx("tick"); });
+updateSoundBtn();
+
+// ===== Nhiều người chơi: broker MQTT công cộng làm bộ chuyển tiếp (không cần server riêng) =====
+// Mỗi người gửi vị trí và ngoại hình của mình lên topic riêng, đồng thời nghe tất cả topic người khác.
+// Muốn tách nhóm riêng thì mở link kèm ?room=ten-nhom
+const NETKEY = "cho.net";
+const netCfg = (() => { const d = { on: true }; try { const p = JSON.parse(localStorage.getItem(NETKEY)); if (p && typeof p.on === "boolean") d.on = p.on; } catch {} return d; })();
+const saveNet = () => { try { localStorage.setItem(NETKEY, JSON.stringify(netCfg)); } catch {} };
+const NET = {
+  brokers: ["wss://broker.emqx.io:8084/mqtt", "wss://broker.hivemq.com:8884/mqtt"], bi: 0, fails: 0,
+  ns: "chophien2d-k7q4x9",
+  room: (new URLSearchParams(location.search).get("room") || "main").toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24) || "main",
+  id: Math.random().toString(36).slice(2, 10), client: null, state: "off", last: 0, sig: "", chatAt: 0,
+};
+const NET_BASE = () => `${NET.ns}/${NET.room}`;
+const AV_KEYS = Object.keys(PARTS), MAX_REMOTE = 40;
+const remotes = new Map();
+
+function netState() {
+  return { i: NET.id, n: player.name, k: profile.color, s: profile.status, p: profile.pet, a: AV_KEYS.map(k => player.avatar[k]),
+    x: Math.round(player.x), y: Math.round(player.y), d: player.dir, m: player.moving ? 1 : 0 };
+}
+function netSend(topic, obj) { try { if (NET.state === "ok") NET.client.publish(topic, JSON.stringify(obj)); } catch {} }
+function setNetState(st) { if (NET.state !== st) { NET.state = st; updateNetBtn(true); if ($("grid") && document.querySelector(".cz-panel [data-sc=net]")) renderSettings(); } }
+
+function netStart() {
+  if (!netCfg.on || NET.client) return;
+  if (!window.mqtt) { setNetState("offline"); return; }
+  setNetState("connecting");
+  const base = NET_BASE();
+  let c;
+  try {
+    c = mqtt.connect(NET.brokers[NET.bi % NET.brokers.length], { clientId: "cp_" + NET.id, keepalive: 20, reconnectPeriod: 4000, connectTimeout: 8000, clean: true,
+      will: { topic: `${base}/p/${NET.id}`, payload: JSON.stringify({ bye: 1 }), qos: 0 } });
+  } catch { setNetState("offline"); return; }
+  NET.client = c; let everConnected = false;
+  c.on("connect", () => {
+    everConnected = true; NET.fails = 0; setNetState("ok");
+    c.subscribe([`${base}/p/+`, `${base}/chat`, `${base}/hello`], { qos: 0 });
+    NET.sig = ""; netSend(`${base}/hello`, { i: NET.id }); netSend(`${base}/p/${NET.id}`, netState());
+  });
+  c.on("message", (topic, payload) => { try { if (payload.length < 700) netMessage(topic, JSON.parse(payload.toString())); } catch {} });
+  const down = () => {
+    if (NET.client !== c) return;
+    setNetState(everConnected ? "connecting" : "offline");
+    if (!everConnected && ++NET.fails >= 2) { NET.fails = 0; NET.bi++; c.end(true); NET.client = null; setTimeout(netStart, 500); } // broker này không vào được: thử broker kế
+  };
+  c.on("close", down); c.on("error", () => {});
+}
+function netStop() {
+  const c = NET.client; NET.client = null;
+  if (c) { try { c.publish(`${NET_BASE()}/p/${NET.id}`, JSON.stringify({ bye: 1 })); c.end(); } catch {} }
+  remotes.clear(); setNetState("off");
+}
+addEventListener("pagehide", () => { const c = NET.client; if (c && NET.state === "ok") try { c.publish(`${NET_BASE()}/p/${NET.id}`, JSON.stringify({ bye: 1 })); } catch {} });
+addEventListener("load", netStart);
+
+// Nhận tin: luôn kiểm tra dữ liệu vì ai cũng gửi được lên broker công cộng
+const cleanText = (t, n) => String(t ?? "").replace(/[\u0000-\u001f\u007f<>]/g, "").trim().slice(0, n);
+function netMessage(topic, m) {
+  if (!m || typeof m !== "object") return;
+  const base = NET_BASE();
+  if (topic === `${base}/hello`) { if (m.i !== NET.id) setTimeout(() => { NET.sig = ""; netSend(`${base}/p/${NET.id}`, netState()); }, Math.random() * 300); return; }
+  if (topic === `${base}/chat`) { netChat(m); return; }
+  if (!topic.startsWith(`${base}/p/`)) return;
+  const id = topic.slice(base.length + 3);
+  if (id === NET.id || !/^[a-z0-9]{4,12}$/.test(id)) return;
+  if (m.bye) { remotes.delete(id); updateNetBtn(true); return; }
+  const a = Array.isArray(m.a) ? m.a.map(Number) : null;
+  if (!a || a.length !== AV_KEYS.length || a.some((v, i) => !(v >= 0 && v < PARTS[AV_KEYS[i]].opts.length && Number.isInteger(v)))) return;
+  const x = +m.x, y = +m.y; if (!(x >= 0 && x <= WORLD.w && y >= 0 && y <= WORLD.h)) return;
+  let r = remotes.get(id);
+  if (!r) {
+    if (remotes.size >= MAX_REMOTE) return;
+    r = { id, x, y, tx: x, ty: y, dir: 1, walk: 0, moving: false, bubble: null, pet: { x: x - 34, y: y + 4, dir: 1, moving: false, walk: 0 }, seen: 0, chatAt: 0 };
+    remotes.set(id, r); updateNetBtn(true); sfx("tick");
+  }
+  r.tx = x; r.ty = y; r.dir = m.d < 0 ? -1 : 1; r.mflag = !!m.m; r.seen = performance.now();
+  r.name = cleanText(m.n, 16) || "Khách";
+  r.avatar = Object.fromEntries(AV_KEYS.map((k, i) => [k, a[i]]));
+  const ci = Number.isInteger(+m.k) && +m.k >= 0 && +m.k < NAME_COLORS.length ? +m.k : 0;
+  const si = Number.isInteger(+m.s) && +m.s >= 0 && +m.s < STATUSES.length ? +m.s : 0;
+  r.petI = Number.isInteger(+m.p) && +m.p >= 0 && +m.p < PETS.length ? +m.p : 0;
+  r.nameColor = NAME_COLORS[ci]; r.label = `${STATUSES[si]} ${r.name}`.trim();
+}
+function netChat(m) {
+  const id = String(m.i || ""), r = remotes.get(id), now = performance.now(); if (!r || now - r.chatAt < 800) return;
+  const text = cleanText(m.t, 60); if (!text) return;
+  r.chatAt = now; r.bubble = { text, from: now / 1000, until: now / 1000 + 5 }; sfx("pop");
+}
+function sendChat(text) {
+  text = cleanText(text, 60); const now = performance.now();
+  if (!text || now - NET.chatAt < 1000) return false;
+  NET.chatAt = now; player.bubble = { text, from: now / 1000, until: now / 1000 + 5 };
+  netSend(`${NET_BASE()}/chat`, { i: NET.id, t: text }); return true;
+}
+// Mỗi khung hình: làm mượt người khác, bỏ người im quá lâu, gửi trạng thái của mình (tối đa 10 lần/giây khi di chuyển, 1 lần/giây khi đứng)
+function updateNet(dt) {
+  const now = performance.now();
+  for (const [id, r] of remotes) {
+    if (now - r.seen > 8000) { remotes.delete(id); updateNetBtn(true); continue; }
+    const dx = r.tx - r.x, dy = r.ty - r.y, k = 1 - Math.pow(0.8, dt), mv = Math.hypot(dx * k, dy * k);
+    r.x += dx * k; r.y += dy * k; r.moving = mv > .15 || (r.mflag && Math.hypot(dx, dy) > 1.5); r.walk += mv * .055;
+    const p = r.pet, tx = r.x - r.dir * 34, ty = r.y + 4, pd = Math.hypot(tx - p.x, ty - p.y);
+    if (pd > 300) { p.x = tx; p.y = ty; } else if (pd > 6) { const sp = Math.min(pd, Math.max(1.2 * dt, pd * (1 - Math.pow(.92, dt)))); p.x += (tx - p.x) / pd * sp; p.y += (ty - p.y) / pd * sp; p.walk += sp * .15; p.dir = tx > p.x ? 1 : -1; p.moving = true; } else p.moving = false;
+    if (r.bubble && now / 1000 > r.bubble.until) r.bubble = null;
+  }
+  if (player.bubble && now / 1000 > player.bubble.until) player.bubble = null;
+  if (NET.state !== "ok") return;
+  const st = netState(), sig = `${st.n}|${st.k}|${st.s}|${st.p}|${st.a}|${st.x}|${st.y}|${st.d}|${st.m}`, since = now - NET.last;
+  if ((sig !== NET.sig && since >= 100) || since >= 1000) { NET.last = now; NET.sig = sig; netSend(`${NET_BASE()}/p/${NET.id}`, st); }
+}
+function drawRemote(r) { drawChar(r, false); if (PETS[r.petI]) drawPet(r.pet, PETS[r.petI]); }
+let netBtnKey = "";
+function updateNetBtn(force) {
+  const b = $("netBtn"); if (!b) return;
+  const n = remotes.size + 1, key = NET.state + n; if (key === netBtnKey && !force) return; netBtnKey = key;
+  b.querySelector(".n").textContent = NET.state === "ok" ? `${n}` : NET.state === "off" ? "–" : "…";
+  b.title = NET.state === "ok" ? `${n} người đang ở chợ (phòng ${NET.room}). Bấm để nhắn tin` : NET.state === "off" ? "Chế độ chơi cùng đang tắt" : "Đang kết nối…";
+  b.classList.toggle("online", NET.state === "ok");
+}
+const netStatusText = () => NET.state === "ok" ? `${remotes.size + 1} người · phòng ${NET.room}` : NET.state === "off" ? "Đang tắt" : NET.state === "connecting" ? "Đang kết nối…" : "Không kết nối được";
+
+// --- Khung nhắn tin
+function openChat() {
+  if (modalOpen()) return;
+  $("chatBar").hidden = false; $("chatIn").focus();
+  for (const k in keys) keys[k] = false;
+}
+function closeChat() { $("chatBar").hidden = true; $("chatIn").blur(); }
+$("netBtn").onclick = () => $("chatBar").hidden ? openChat() : closeChat();
+$("chatBar").addEventListener("submit", e => { e.preventDefault(); const i = $("chatIn"); if (sendChat(i.value)) { i.value = ""; closeChat(); } });
+$("chatBar").addEventListener("keydown", e => { if (e.key === "Escape") closeChat(); });
+updateNetBtn(true);
+
+// ===== Gian hàng: mỗi tiệm một kiểu mái, tường, biển hiệu và đồ trưng bày riêng =====
+const OL = "#2b1d16"; // viền tối kiểu pixel art, khớp với tile Tiny Town
+function rect(x, y, w, h, fill, ol = OL) { ctx.fillStyle = ol; ctx.fillRect(x - 2, y - 2, w + 4, h + 4); ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); }
+function circ(x, y, r, fill, ol = OL) { ctx.fillStyle = ol; ctx.beginPath(); ctx.arc(x, y, r + 2, 0, 7); ctx.fill(); ctx.fillStyle = fill; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+function emoji(e, x, y, size) { ctx.fillStyle = "#000"; ctx.font = `${size}px serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(e, x, y); }
+const tileSized = (c, r, x, y, size) => ctx.drawImage(TOWN, c * 16, r * 16, 16, 16, x, y, size, size);
+function clipTo(x, y, w, h, fn) { ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); fn(); ctx.restore(); }
+
+// --- Mái
+function roofAwning(x, y, w, h, c1, c2) {
+  const n = 10, sw = (w + 16) / n, x0 = x - 8;
+  ctx.fillStyle = OL; ctx.fillRect(x0 - 2, y - 2, w + 20, h + 4);
+  for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? c2 : c1; ctx.fillRect(x0 + i * sw, y, sw + 1, h); }
+  for (let i = 0; i < n; i++) { // mép rủ hình vỏ sò
+    ctx.fillStyle = OL; ctx.beginPath(); ctx.arc(x0 + (i + .5) * sw, y + h, sw / 2 + 2, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = i % 2 ? c2 : c1; ctx.beginPath(); ctx.arc(x0 + (i + .5) * sw, y + h, sw / 2, 0, Math.PI); ctx.fill();
+  }
+}
+function roofTiles(x, y, w, h, col) { // mái ngói lấy từ Tiny Town: cột 1 = ngói xám xanh, cột 5 = ngói đỏ
+  const sz = h / 2;
+  clipTo(x - 10, y, w + 20, h, () => { for (let tx = x - 10; tx < x + w + 10; tx += sz) { tileSized(col, 4, tx, y, sz); tileSized(col, 5, tx, y + sz, sz); } });
+  ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.strokeRect(x - 10, y, w + 20, h);
+}
+function roofThatch(x, y, w, h) { // mái rơm
+  const poly = (d, fill) => { ctx.fillStyle = fill; ctx.beginPath(); ctx.moveTo(x - 16 + d, y + h - d); ctx.lineTo(x + 14 + d, y + d - 4);
+    ctx.lineTo(x + w - 14 - d, y + d - 4); ctx.lineTo(x + w + 16 - d, y + h - d); ctx.fill(); };
+  poly(0, OL); poly(3, "#d9ae4f");
+  ctx.strokeStyle = "#a87b26"; ctx.lineWidth = 2;
+  for (let i = 0; i <= 24; i++) { const f = i / 24; ctx.beginPath(); ctx.moveTo(x - 12 + f * (w + 24), y + h - 3); ctx.lineTo(x + 16 + f * (w - 32), y + 1); ctx.stroke(); }
+  ctx.fillStyle = "#d9ae4f";
+  for (let i = -12; i < w + 12; i += 8) { ctx.beginPath(); ctx.moveTo(x + i, y + h - 4); ctx.lineTo(x + i + 4, y + h + 7); ctx.lineTo(x + i + 8, y + h - 4); ctx.fill(); }
+}
+// --- Tường
+function wall(x, y, w, h, kind, color, accent) {
+  clipTo(x, y, w, h, () => {
+    if (kind === "wood") { for (let ty = y; ty < y + h; ty += T) for (let tx = x; tx < x + w; tx += T) tile(1, 6, tx, ty); }
+    else if (kind === "stone") { for (let ty = y; ty < y + h; ty += T) for (let tx = x; tx < x + w; tx += T) tile(5, 6, tx, ty); }
+    else if (kind === "bamboo") { ctx.fillStyle = "#c9a76b"; ctx.fillRect(x, y, w, h);
+      for (let i = 0; i < w; i += 12) { ctx.fillStyle = "#b08a4a"; ctx.fillRect(x + i, y, 2, h); ctx.fillStyle = "#e0c68e"; ctx.fillRect(x + i + 3, y, 2, h); } }
+    else if (kind === "dots") { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); ctx.fillStyle = accent;
+      for (let j = 0; j < h; j += 14) for (let i = (j / 14 % 2) * 7; i < w; i += 14) ctx.fillRect(x + i, y + j, 4, 4); }
+    else { ctx.fillStyle = color; ctx.fillRect(x, y, w, h); ctx.fillStyle = accent; for (let i = 0; i < w; i += 18) ctx.fillRect(x + i, y, 7, h); }
+  });
+  ctx.strokeStyle = OL; ctx.lineWidth = 3; ctx.strokeRect(x, y, w, h);
+}
+// --- Biển hiệu nổi trên nóc: huy hiệu tròn có icon lớn + bảng tên
+function signboard(s, cx, y) {
+  const bw = 156, bh = 30;
+  rect(cx - 60, y + bh - 4, 6, 12, "#6d4c41"); rect(cx + 54, y + bh - 4, 6, 12, "#6d4c41");
+  rect(cx - bw / 2, y, bw, bh, s.board || "#fff8e1");
+  ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.strokeRect(cx - bw / 2 + 4, y + 4, bw - 8, bh - 8);
+  ctx.fillStyle = s.boardText || "#3e2723"; ctx.font = "bold 14px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(s.name.toUpperCase(), cx, y + bh / 2 + 1);
+  circ(cx, y - 22, 25, s.color); circ(cx, y - 22, 19, "#fffdf5", s.color);
+  emoji(s.icon, cx, y - 20, 26);
+}
+
+// --- Đồ trưng bày từng loại. F = dải quầy phía trước (phía đường), B = phần tường phía sau
+function tee(x, y, c, sway) { // áo thun treo móc
+  ctx.save(); ctx.translate(x, y); ctx.rotate(sway);
+  ctx.strokeStyle = "#ccc"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(0, -2); ctx.moveTo(-8, 2); ctx.lineTo(0, -3); ctx.lineTo(8, 2); ctx.stroke();
+  ctx.fillStyle = OL; ctx.fillRect(-12, 0, 24, 9); ctx.fillRect(-8, 0, 16, 22);
+  ctx.fillStyle = c; ctx.fillRect(-10, 2, 20, 6); ctx.fillRect(-6, 2, 12, 18);
+  ctx.fillStyle = OL; ctx.fillRect(-2, 2, 4, 2);
+  ctx.restore();
+}
+function mannequin(x, y, c) {
+  rect(x - 1, y + 34, 2, 14, "#8d6e63"); rect(x - 8, y + 46, 16, 3, "#6d4c41");
+  circ(x, y, 6, "#f0d9b5");
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.moveTo(x - 9, y + 6); ctx.lineTo(x + 9, y + 6); ctx.lineTo(x + 15, y + 38); ctx.lineTo(x - 15, y + 38); ctx.fill();
+  ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - 7, y + 8); ctx.lineTo(x + 7, y + 8); ctx.lineTo(x + 12, y + 36); ctx.lineTo(x - 12, y + 36); ctx.fill();
+}
+function steam(x, y, t) {
+  for (let i = 0; i < 4; i++) {
+    const k = (t * 0.6 + i / 4) % 1;
+    ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - k)})`;
+    ctx.beginPath(); ctx.arc(x + Math.sin(k * 6 + i) * 6, y - k * 34, 4 + k * 6, 0, 7); ctx.fill();
+  }
+}
+function sparkle(x, y, t, phase) {
+  const a = (Math.sin(t * 3 + phase) + 1) / 2; if (a < 0.3) return;
+  ctx.fillStyle = `rgba(255,255,255,${a})`; const r = 2 + a * 4;
+  ctx.fillRect(x - r, y - 1, r * 2, 2); ctx.fillRect(x - 1, y - r, 2, r * 2);
+}
+function lantern(x, y, t, phase) {
+  const sw = Math.sin(t * 2 + phase) * 0.12;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(sw);
+  ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 8); ctx.stroke();
+  rect(-4, 8, 8, 3, "#ffd54f"); ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(0, 22, 11, 13, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#e53935"; ctx.beginPath(); ctx.ellipse(0, 22, 9, 11, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = "#ff8a65"; ctx.fillRect(-2, 13, 4, 18); rect(-4, 33, 8, 3, "#ffd54f");
+  ctx.restore();
+}
+function crate(x, y, w, h, fruit, size = 15) {
+  rect(x, y, w, h, "#b07a43");
+  ctx.fillStyle = "#8a5a2b"; ctx.fillRect(x, y + h / 2 - 1, w, 3);
+  emoji(fruit, x + w * 0.25, y - 2, size); emoji(fruit, x + w * 0.5, y - 6, size); emoji(fruit, x + w * 0.75, y - 2, size);
+}
+function jar(x, y, c1, c2) {
+  rect(x - 9, y - 2, 18, 5, "#e57373");
+  ctx.fillStyle = OL; ctx.fillRect(x - 11, y + 3, 22, 26);
+  ctx.fillStyle = "#e3f6f9"; ctx.fillRect(x - 9, y + 5, 18, 22);
+  for (let i = 0; i < 9; i++) { ctx.fillStyle = i % 2 ? c1 : c2; ctx.beginPath(); ctx.arc(x - 5 + (i % 3) * 5, y + 12 + (i / 3 | 0) * 5, 2.5, 0, 7); ctx.fill(); }
+  ctx.fillStyle = "rgba(255,255,255,.7)"; ctx.fillRect(x - 7, y + 7, 2, 14);
+}
+function lollipop(x, y, c1, c2, t) {
+  rect(x - 2, y, 4, 56, "#fafafa");
+  circ(x, y - 4, 16, c1);
+  ctx.strokeStyle = c2; ctx.lineWidth = 4; ctx.beginPath();
+  for (let a = 0; a < 12; a += 0.2) { const r = a * 1.2; ctx.lineTo(x + Math.cos(a + t) * r, y - 4 + Math.sin(a + t) * r); } ctx.stroke();
+}
+function stool(x, y, c) { rect(x - 8, y, 16, 4, c); rect(x - 7, y + 4, 3, 9, c); rect(x + 4, y + 4, 3, 9, c); }
+
+const STALL_STYLE = {
+  clothes: { roof: ["awning", "#e53935", "#ffffff"], wall: ["paint", "#f6e7da", "#efd9c6"],
+    back(s, B) { mannequin(B.x + 26, B.y + 4, "#e53935"); mannequin(B.x + B.w - 26, B.y + 4, "#1e88e5");
+      rect(B.x + 70, B.y + 10, 80, 30, "#fff"); ctx.fillStyle = "#e53935"; ctx.font = "bold 13px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("SALE 50%", B.x + 110, B.y + 25); },
+    front(s, F, t) { rect(F.x + 6, F.y + 6, F.w - 12, 4, "#9e9e9e"); rect(F.x + 6, F.y + 6, 4, F.h - 8, "#9e9e9e"); rect(F.x + F.w - 10, F.y + 6, 4, F.h - 8, "#9e9e9e");
+      ["#ffca28", "#26a69a", "#ef5350", "#7e57c2", "#66bb6a", "#29b6f6", "#ff7043"].forEach((c, i) => tee(F.x + 28 + i * 27, F.y + 16, c, Math.sin(t * 2 + i) * 0.08)); } },
+  shoes: { roof: ["tiles", 1], wall: ["wood"],
+    back(s, B) { [["#ef5350", 0], ["#42a5f5", 1], ["#ffca28", 2], ["#66bb6a", 0]].forEach(([c, n], i) => {
+        for (let k = 0; k <= n; k++) { rect(B.x + 14 + i * 52, B.y + 34 - k * 16, 40, 14, c); ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.fillRect(B.x + 14 + i * 52, B.y + 34 - k * 16, 40, 4); } }); },
+    front(s, F) { const steps = [["👟", "👠", "🥿"], ["👞", "🩴", "👢"]];
+      steps.forEach((row, r) => { rect(F.x + 8 + r * 12, F.y + 8 + r * 24, F.w - 16 - r * 24, 18, r ? "#a1887f" : "#8d6e63");
+        row.forEach((e, i) => emoji(e, F.x + 50 + r * 6 + i * (F.w - 100 - r * 12) / 2, F.y + 4 + r * 24, 20)); }); } },
+  accessories: { roof: ["awning", "#283593", "#ffd54f"], wall: ["paint", "#33407a", "#2b366a"], board: "#1a237e", boardText: "#ffd54f",
+    back(s, B) { rect(B.x + 12, B.y + 4, B.w - 24, 44, "#d7ccc8");
+      ctx.fillStyle = "#a1887f"; for (let i = 0; i < 9; i++) for (let j = 0; j < 3; j++) ctx.fillRect(B.x + 22 + i * 22, B.y + 12 + j * 14, 3, 3);
+      ["🧢", "👒", "🎩", "🕶️", "👜"].forEach((e, i) => emoji(e, B.x + 36 + i * 37, B.y + 26, 22)); },
+    front(s, F, t) { ctx.fillStyle = OL; ctx.fillRect(F.x + 8, F.y + 4, F.w - 16, F.h - 6);
+      ctx.fillStyle = "#cfe8f5"; ctx.fillRect(F.x + 11, F.y + 7, F.w - 22, F.h - 12);
+      ["⌚", "💍", "📿", "👓", "🎀"].forEach((e, i) => emoji(e, F.x + 34 + i * 38, F.y + 26, 20));
+      ctx.fillStyle = "rgba(255,255,255,.55)"; const gx = F.x + 20 + ((t * 40) % (F.w + 40)) - 20;
+      ctx.beginPath(); ctx.moveTo(gx, F.y + 7); ctx.lineTo(gx + 14, F.y + 7); ctx.lineTo(gx - 6, F.y + F.h - 5); ctx.lineTo(gx - 20, F.y + F.h - 5); ctx.fill();
+      ctx.fillStyle = "#8d6e63"; ctx.fillRect(F.x + 8, F.y + F.h - 6, F.w - 16, 6); } },
+  cosmetics: { roof: ["awning", "#ad1457", "#fce4ec"], wall: ["paint", "#fde4ec", "#f8d3e0"],
+    back(s, B, t) { ctx.fillStyle = OL; ctx.beginPath(); ctx.ellipse(B.x + B.w / 2, B.y + 26, 34, 26, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#ffd54f"; ctx.beginPath(); ctx.ellipse(B.x + B.w / 2, B.y + 26, 31, 23, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#cfe8f5"; ctx.beginPath(); ctx.ellipse(B.x + B.w / 2, B.y + 26, 25, 18, 0, 0, 7); ctx.fill();
+      sparkle(B.x + B.w / 2 + 10, B.y + 18, t, 0); sparkle(B.x + B.w / 2 - 12, B.y + 32, t, 2);
+      for (let i = 0; i < 6; i++) { const lx = i < 3 ? B.x + 20 + i * 18 : B.x + B.w - 56 + (i - 3) * 18; circ(lx, B.y + 10, 4, (Math.sin(t * 4 + i) > 0) ? "#fff59d" : "#fbc02d"); } },
+    front(s, F) { rect(F.x + 6, F.y + 20, F.w - 12, F.h - 22, "#f48fb1");
+      [["#ce93d8", 26], ["#80deea", 20], ["#ffcc80", 30], ["#ef9a9a", 22], ["#b39ddb", 28], ["#a5d6a7", 18], ["#f06292", 24]].forEach(([c, hh], i) => {
+        const bx = F.x + 22 + i * 27; rect(bx - 6, F.y + 20 - hh, 12, hh, c); rect(bx - 3, F.y + 14 - hh, 6, 5, "#fafafa"); });
+      emoji("💄", F.x + F.w - 24, F.y + 36, 18); emoji("🧴", F.x + 24, F.y + 36, 18); } },
+  food: { roof: ["tiles", 5], wall: ["wood"], lanterns: true,
+    back(s, B) { rect(B.x + B.w - 90, B.y + 4, 74, 46, "#263238"); ctx.fillStyle = "#eceff1"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ["THỰC ĐƠN", "Phở .... 45k", "Bánh mì . 25k", "Cơm tấm  40k"].forEach((l, i) => ctx.fillText(l, B.x + B.w - 84, B.y + 12 + i * 11));
+      emoji("🍜", B.x + 40, B.y + 26, 34); },
+    front(s, F, t) { rect(F.x + 6, F.y + 14, F.w - 12, F.h - 16, "#8d6e63");
+      circ(F.x + 50, F.y + 18, 4, "#424242"); rect(F.x + 26, F.y + 6, 48, 28, "#90a4ae"); rect(F.x + 22, F.y + 4, 56, 6, "#b0bec5"); steam(F.x + 50, F.y, t);
+      emoji("🥖", F.x + 110, F.y + 26, 22); emoji("🍢", F.x + 146, F.y + 26, 22); emoji("🍚", F.x + 182, F.y + 26, 22); } },
+  drinks: { roof: ["awning", "#00897b", "#e0f2f1"], wall: ["paint", "#d7f2ee", "#c4eae4"],
+    back(s, B) { rect(B.x + 14, B.y + 2, 52, 52, "#eceff1"); rect(B.x + 19, B.y + 7, 42, 40, "#b3e5fc");
+      ["#ff7043", "#66bb6a", "#ffca28", "#8d6e63", "#ef5350", "#42a5f5"].forEach((c, i) => rect(B.x + 23 + (i % 3) * 13, B.y + 11 + (i / 3 | 0) * 18, 7, 14, c));
+      emoji("🥥", B.x + 110, B.y + 28, 30); emoji("🧊", B.x + 160, B.y + 30, 22); },
+    front(s, F) { rect(F.x + 6, F.y + 22, F.w - 12, F.h - 24, "#4db6ac");
+      [["#a1887f", "#5d4037"], ["#ffb74d", "#e65100"], ["#aed581", "#33691e"], ["#f48fb1", "#ad1457"], ["#fff59d", "#f9a825"], ["#ce93d8", "#6a1b9a"]].forEach(([c, d], i) => {
+        const cx = F.x + 30 + i * 32; rect(cx - 9, F.y + 2, 18, 22, c); ctx.fillStyle = d; ctx.fillRect(cx - 9, F.y + 18, 18, 6);
+        ctx.fillStyle = d; ctx.beginPath(); ctx.arc(cx - 4, F.y + 21, 1.5, 0, 7); ctx.arc(cx + 3, F.y + 21, 1.5, 0, 7); ctx.fill();
+        rect(cx + 2, F.y - 8, 3, 12, "#ffffff"); }); } },
+  fruit: { roof: ["thatch"], wall: ["bamboo"],
+    back(s, B, t) { ctx.strokeStyle = OL; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(B.x + 30, B.y); ctx.lineTo(B.x + 30, B.y + 8); ctx.stroke();
+      ctx.save(); ctx.translate(B.x + 30, B.y + 8); ctx.rotate(Math.sin(t * 1.5) * 0.1); emoji("🍌", 0, 14, 28); ctx.restore();
+      emoji("🍉", B.x + 90, B.y + 34, 28); emoji("🍉", B.x + 118, B.y + 36, 28); emoji("🍉", B.x + 104, B.y + 18, 28);
+      emoji("🍍", B.x + 170, B.y + 26, 28); },
+    front(s, F) { crate(F.x + 6, F.y + 24, 48, 30, "🍎"); crate(F.x + 60, F.y + 24, 48, 30, "🍊");
+      crate(F.x + 114, F.y + 24, 48, 30, "🥭"); crate(F.x + 168, F.y + 24, 46, 30, "🍇"); } },
+  candy: { roof: ["awning", "#f06292", "#b2ebf2"], wall: ["dots", "#fff0f6", "#f8bbd0"], lollipops: true,
+    back(s, B) { rect(B.x + 14, B.y + 36, B.w - 28, 5, "#bcaaa4");
+      ["🍪", "🍩", "🧁", "🍰", "🍫", "🍭"].forEach((e, i) => emoji(e, B.x + 32 + i * 31, B.y + 22, 22)); },
+    front(s, F) { rect(F.x + 6, F.y + 30, F.w - 12, F.h - 32, "#f8bbd0");
+      [["#f06292", "#fff176"], ["#4dd0e1", "#ba68c8"], ["#81c784", "#ff8a65"], ["#ffd54f", "#e57373"], ["#9575cd", "#4fc3f7"], ["#ff8a65", "#aed581"]].forEach(([a, b], i) => jar(F.x + 26 + i * 34, F.y + 2, a, b)); } },
+};
+
+function drawStall(s, t) {
+  const { x, y, w, h, top } = s, st = STALL_STYLE[s.kind];
+  const ROOF_H = 52, FH = 58;
+  ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.fillRect(x + 8, y + 10, w, h);
+  const F = top ? { x, y: y + h - FH - 4, w, h: FH } : { x, y: y + ROOF_H + 8, w, h: FH };
+  const B = top ? { x, y: y + ROOF_H + 8, w, h: F.y - y - ROOF_H - 10 } : { x, y: F.y + FH + 6, w, h: y + h - F.y - FH - 10 };
+  if (st.lollipops) { lollipop(x - 14, y + 70, "#f06292", "#fff", t); lollipop(x + w + 14, y + 70, "#4dd0e1", "#fff", -t); }
+  wall(x, y + 30, w, h - 30, ...st.wall);
+  st.back(s, B, t);
+  st.front(s, F, t);
+  const [rk, ...ra] = st.roof;
+  if (rk === "awning") roofAwning(x, y, w, ROOF_H - 14, ...ra);
+  else if (rk === "tiles") roofTiles(x, y, w, ROOF_H, ...ra);
+  else roofThatch(x, y, w, ROOF_H);
+  if (st.lanterns) { lantern(x + 14, y + ROOF_H, t, 0); lantern(x + w - 14, y + ROOF_H, t, 1.7); }
+  if (s.kind === "food") { const sy = top ? y + h + 8 : y - 22; stool(x + w + 8, sy, "#e53935"); stool(x + w + 28, sy + 6, "#1e88e5"); }
+  if (isClosed(s)) drawShutter(s);
+  theme().stallDeco?.(s, t);      // trang trí mái/hai bên: vẽ trước để bảng tên nằm trên
+  signboard(s, x + w / 2, y - 18);
+  themeStallTop(s);               // mũ Noel, huy hiệu chợ đêm: vẽ sau cùng
+  if (s === nearStall) {
+    ctx.strokeStyle = "#ffeb3b"; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
+    ctx.strokeRect(s.zone.x, s.zone.y, s.zone.w, s.zone.h); ctx.setLineDash([]);
+  }
+}
+function drawTree([x, y], i) {
+  const col = i % 3 === 2 ? 3 : 4; // xen kẽ cây xanh và cây vàng
+  ctx.fillStyle = "rgba(0,0,0,.2)"; ctx.beginPath(); ctx.ellipse(x, y + 10, 22, 7, 0, 0, 7); ctx.fill();
+  tile(col, 0, x - T / 2, y + 12 - 2 * T); tile(col, 1, x - T / 2, y + 12 - T);
+}
+function drawChar(c, isPlayer) {
+  const now = performance.now() / 1000, step = Math.floor(c.walk) % 4;
+  const hop = c.moving ? (step % 2 ? 3 : 0) : c.hopUntil > now ? Math.abs(Math.sin((c.hopUntil - now) * 15)) * 8 : 0;
+  ctx.fillStyle = "rgba(0,0,0,.25)"; ctx.beginPath(); ctx.ellipse(c.x, c.y, 14, 5, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(Math.round(c.x), Math.round(c.y - 46 - hop)); if (c.dir < 0) ctx.scale(-1, 1);
+  ctx.drawImage(framesOf(c.avatar)[c.moving ? step : 0], -24, 0, 48, 48);
+  ctx.restore();
+  if (theme().hat) drawHat(c, hop);
+  if (isPlayer) { ctx.fillStyle = "#ffeb3b"; ctx.beginPath(); ctx.moveTo(c.x - 6, c.y - 58); ctx.lineTo(c.x + 6, c.y - 58); ctx.lineTo(c.x, c.y - 50); ctx.fill(); }
+  const ny = isPlayer ? c.y - 62 : c.y - 50;
+  ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const label = isPlayer ? playerLabel() : c.label ?? c.name;
+  ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.6)"; ctx.strokeText(label, c.x, ny);
+  ctx.fillStyle = isPlayer ? NAME_COLORS[profile.color] : c.nameColor ?? (c.keeper ? "#ffcc80" : "#fff"); ctx.fillText(label, c.x, ny);
+}
+// Bong bóng thoại: chữ tự xuống dòng, hiện dần rồi mờ dần
+function drawBubble(k, t) {
+  const b = k.bubble; if (!b) return;
+  const a = Math.min(1, (t - b.from) * 5, (b.until - t) * 3);
+  ctx.save(); ctx.globalAlpha = Math.max(0, a);
+  ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
+  const words = b.text.split(" "), lines = [""];
+  for (const wd of words) { const tryL = (lines.at(-1) + " " + wd).trim(); if (ctx.measureText(tryL).width > 150 && lines.at(-1)) lines.push(wd); else lines[lines.length - 1] = tryL; }
+  const bw = Math.max(...lines.map(l => ctx.measureText(l).width)) + 18, bh = lines.length * 15 + 12;
+  const pop = Math.min(1, (t - b.from) * 6), bx = Math.max(cam.x + 6, Math.min(k.x - bw / 2, cam.x + cam.w - bw - 6)), by = k.y - 66 - bh - (1 - pop) * 6;
+  ctx.fillStyle = OL; ctx.beginPath(); ctx.roundRect(bx - 2, by - 2, bw + 4, bh + 4, 10); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(k.x - 8, by + bh); ctx.lineTo(k.x + 8, by + bh); ctx.lineTo(k.x, by + bh + 11); ctx.fill();
+  ctx.fillStyle = "#fffdf5"; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 8); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(k.x - 6, by + bh - 1); ctx.lineTo(k.x + 6, by + bh - 1); ctx.lineTo(k.x, by + bh + 7); ctx.fill();
+  ctx.fillStyle = "#3e2723"; lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 7 + i * 15));
+  ctx.restore();
+}
+function draw() {
+  ctx.setTransform(devicePixelRatio * VIEW, 0, 0, devicePixelRatio * VIEW, 0, 0);
+  ctx.fillStyle = "#2b2b2b"; ctx.fillRect(0, 0, cam.w, cam.h);
+  const px = devicePixelRatio * VIEW; // làm tròn theo điểm ảnh thật của màn hình: camera trôi mượt mà pixel art vẫn sắc nét
+  ctx.translate(-Math.round(cam.x * px) / px, -Math.round(cam.y * px) / px);
+  ctx.imageSmoothingEnabled = false;
+  const t = performance.now() / 1000;
+  ctx.drawImage(groundCv, 0, 0);
+  drawGroundFx(t);
+  drawGate();
+  if (player.target) { ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(player.target.x, player.target.y, 10, 5, 0, 0, 7); ctx.stroke(); }
+  STALLS.forEach(s => drawStall(s, t));
+  // sắp xếp theo y để nhân vật/cây che nhau đúng chiều sâu
+  [...TREES.map((t, i) => ({ y: t[1], f: () => drawTree(t, i) })),
+   ...themeDecorItems(t),
+   ...npcs.filter(n => !n.hidden).map(n => ({ y: n.y, f: () => drawChar(n, false) })),
+   ...keepers.map(k => ({ y: k.y, f: () => drawChar(k, false) })),
+   ...[...remotes.values()].map(r => ({ y: r.y, f: () => drawRemote(r) })),
+   ...(PETS[profile.pet] ? [{ y: pet.y, f: drawPet }] : []),
+   { y: player.y, f: () => drawChar(player, true) }]
+    .sort((a, b) => a.y - b.y).forEach(o => o.f());
+  drawThemeOverlay(t);   // dây đèn giăng trên đường
+  drawLighting(t);       // đêm/chiều: phủ màu và khoét ánh sáng
+  drawFireflies(t);
+  keepers.forEach(k => drawBubble(k, t)); // bong bóng luôn nằm trên cùng
+  remotes.forEach(r => drawBubble(r, t)); if (player.bubble) drawBubble(player, t);
+  ctx.setTransform(devicePixelRatio * VIEW, 0, 0, devicePixelRatio * VIEW, 0, 0);
+  drawParticles(t);      // hoa rơi, tuyết, mưa, tia chớp (toạ độ màn hình)
+  if (modalOpen()) drawStage(t);          // sân xem trước trong bảng nhân vật (nếu đang mở)
+}
+
+let VIEW = 1; // hệ số thu phóng khung nhìn
+function resize() {
+  VIEW = Math.min(innerWidth, innerHeight) < 500 ? 0.8 : 1; // điện thoại: lùi camera ra một chút
+  cam.w = innerWidth / VIEW; cam.h = innerHeight / VIEW;
+  canvas.width = innerWidth * devicePixelRatio; canvas.height = innerHeight * devicePixelRatio;
+  canvas.style.width = innerWidth + "px"; canvas.style.height = innerHeight + "px";
+  lightCv.width = Math.ceil(cam.w * LS); lightCv.height = Math.ceil(cam.h * LS);
+}
+addEventListener("resize", () => { resize(); if (TOWN) updateCamera(1, true); }); resize();
+Promise.all([loadImg(TOWN_PNG), loadImg(CHARS_PNG)]).then(([town, chars]) => {
+  TOWN = town; CHARS = chars;
+  buildGround(); updateAvaIcon(); initParticles(); initFlies();
+  document.body.dataset.theme = scene.theme; Object.assign(amb, targetAmb()); updateSceneBtn(true);
+  updateCamera(1, true);
+  let last = performance.now();
+  (function loop(now = performance.now()) {
+    const dt = Math.min((now - last) / (1000 / 60), 3); // quy về khung 60fps; chặn lại khi tab vừa quay lại
+    last = now;
+    update(dt); draw(); requestAnimationFrame(loop);
+  })();
+});
+</script>
+</body>
+</html>

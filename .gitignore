@@ -1,0 +1,13 @@
+# Bản build để deploy (sinh lại bởi deploy.sh)
+dist/
+
+# File nén asset gốc; bản giải nén trong assets/ đã đủ dùng
+assets/*.zip
+assets/_zip/
+
+# Rác của hệ điều hành và trình soạn thảo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
