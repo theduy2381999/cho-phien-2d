@@ -1565,7 +1565,11 @@ updateNetBtn(true);
 // ===== Accounts: optional login through Supabase (guests can still play) =====
 // Both values below are public by design: the anon key only works within the row level security rules in
 // supabase/schema.sql. Leave them empty to turn accounts off; the login button then stays hidden.
-const SUPABASE_CFG = { url: "", anonKey: "", google: false };
+const SUPABASE_CFG = {
+  url: "https://wrxdcrxbupplgummhrhb.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndyeGRjcnhidXBwbGd1bW1ocmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzOTAyODgsImV4cCI6MjEwOTk2NjI4OH0.Sgr_L2pXBXGRqIfdc6SyUpU-J4OCF7x_cPu4kXA8Og4", // public anon key
+  google: false, // set to true after enabling the Google provider in Supabase
+};
 const acct = { user: null, client: null, busy: false, msg: "", sentTo: "" };
 const accountsEnabled = () => !!(SUPABASE_CFG.url && SUPABASE_CFG.anonKey && window.supabase);
 const IN_APP_BROWSER = /Zalo|FBAN|FBAV|FB_IAB|Messenger|Instagram|Line\//i.test(navigator.userAgent); // Google blocks OAuth in these
