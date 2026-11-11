@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Chợ Phiên 2D</title>
 <script async src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: #2b2b2b; overflow: hidden;
@@ -46,6 +47,20 @@
   #vol { width: 100%; accent-color: #ffb300; }
   #netBtn { position: fixed; top: 144px; right: 12px; background: #fff8e1; color: #5d4037; border: 0; padding: 8px 12px; border-radius: 8px;
     font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.3); font-variant-numeric: tabular-nums; }
+  #acctBtn { position: fixed; top: 188px; right: 12px; background: #fff8e1; color: #5d4037; border: 0; padding: 8px 12px; border-radius: 8px;
+    font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+  #acctBtn[hidden] { display: none; }
+  #acctBtn.signed { background: #e8f5e9; }
+  #acctBtn:focus-visible { outline: 3px solid #1e88e5; outline-offset: 2px; }
+  #toast { position: fixed; left: 50%; top: calc(16px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); z-index: 9; max-width: calc(100vw - 32px);
+    background: rgba(43,29,22,.92); color: #fff8e1; padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 700; pointer-events: none; text-align: center; }
+  #toast[hidden] { display: none; }
+  .acct p { margin: 0; line-height: 1.45; color: #3e2723; }
+  .acct .cz-hint { text-align: left; }
+  .acct-err { color: #c62828 !important; font-weight: 700; }
+  .acct-warn { background: #fff3e0; border: 2px solid #ffb300; border-radius: 12px; padding: 10px 12px; font-size: 13px; }
+  .acct .cz-btn2, .acct .cz-done { justify-self: stretch; }
+  .acct button[disabled] { opacity: .6; cursor: default; }
   #netBtn .dot { width: 8px; height: 8px; border-radius: 50%; background: #bdbdbd; }
   #netBtn.online .dot { background: #43a047; box-shadow: 0 0 0 3px rgba(67,160,71,.25); }
   #netBtn:focus-visible { outline: 3px solid #1e88e5; outline-offset: 2px; }
@@ -239,6 +254,8 @@
 <button id="avaBtn"><canvas id="avaIcon" width="16" height="16"></canvas><span class="t">Nhân vật</span></button>
 <button id="sceneBtn" aria-label="Cảnh chợ: ngày đêm và theme"><span class="ic">☀️</span><span class="t">12:00</span></button>
 <button id="soundBtn" aria-label="Bật hoặc tắt âm thanh" aria-pressed="true">🔊</button>
+<button id="acctBtn" hidden aria-label="Đăng nhập hoặc quản lý tài khoản">👤 <span class="t">Đăng nhập</span></button>
+<div id="toast" hidden role="status"></div>
 <button id="netBtn" aria-label="Số người trong chợ, bấm để nhắn tin"><span class="dot"></span><span>💬</span><span class="n">…</span></button>
 <form id="chatBar" hidden><input id="chatIn" maxlength="60" placeholder="Nói gì đó với mọi người…" autocomplete="off" enterkeyhint="send" aria-label="Tin nhắn"><button type="submit">Gửi</button></form>
 <div id="audioHint" hidden>🔊 Chạm vào màn hình để bật âm thanh</div>
@@ -398,7 +415,7 @@ const loadAvatar = () => {
   } catch {}
   return { ...DEFAULT_AVATAR };
 };
-const saveAvatar = a => { try { localStorage.setItem("cho.avatar2", JSON.stringify(a)); } catch {} };
+const saveAvatar = a => { try { localStorage.setItem("cho.avatar2", JSON.stringify(a)); } catch {} pushProfileSoon(); };
 
 // ===== Characters =====
 function makeChar(x, y, name, avatar) {
@@ -422,7 +439,7 @@ function loadProfile() {
   } catch {}
   return d;
 }
-const saveProfile = p => { try { localStorage.setItem("cho.profile", JSON.stringify(p)); } catch {} };
+const saveProfile = p => { try { localStorage.setItem("cho.profile", JSON.stringify(p)); } catch {} pushProfileSoon(); };
 const profile = loadProfile();
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const player = makeChar(140, ROAD.y + ROAD.h / 2, profile.name, loadAvatar());
@@ -1544,6 +1561,117 @@ $("netBtn").onclick = () => $("chatBar").hidden ? openChat() : closeChat();
 $("chatBar").addEventListener("submit", e => { e.preventDefault(); const i = $("chatIn"); if (sendChat(i.value)) { i.value = ""; closeChat(); } });
 $("chatBar").addEventListener("keydown", e => { if (e.key === "Escape") closeChat(); });
 updateNetBtn(true);
+
+// ===== Accounts: optional login through Supabase (guests can still play) =====
+// Both values below are public by design: the anon key only works within the row level security rules in
+// supabase/schema.sql. Leave them empty to turn accounts off; the login button then stays hidden.
+const SUPABASE_CFG = { url: "", anonKey: "", google: false };
+const acct = { user: null, client: null, busy: false, msg: "", sentTo: "" };
+const accountsEnabled = () => !!(SUPABASE_CFG.url && SUPABASE_CFG.anonKey && window.supabase);
+const IN_APP_BROWSER = /Zalo|FBAN|FBAV|FB_IAB|Messenger|Instagram|Line\//i.test(navigator.userAgent); // Google blocks OAuth in these
+let applyingCloud = false, pushTimer = 0;
+
+function toast(text, ms = 3200) {
+  const t = $("toast"); t.textContent = text; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, ms);
+}
+function initAccounts() {
+  if (acct.client || !accountsEnabled()) return updateAcctBtn();
+  try { acct.client = window.supabase.createClient(SUPABASE_CFG.url, SUPABASE_CFG.anonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }); }
+  catch { return updateAcctBtn(); }
+  acct.client.auth.onAuthStateChange((event, session) => {
+    const prev = acct.user?.id;
+    acct.user = session?.user ?? null;
+    updateAcctBtn(); if (isAcctOpen()) renderAccount();
+    if (acct.user && acct.user.id !== prev) setTimeout(pullProfile, 0); // deferred: never call the client inside its own auth callback
+  });
+  acct.client.auth.getSession().then(({ data }) => {
+    if (data?.session?.user && !acct.user) { acct.user = data.session.user; updateAcctBtn(); pullProfile(); }
+  });
+  updateAcctBtn();
+}
+function updateAcctBtn() {
+  const b = $("acctBtn"); if (!b) return;
+  b.hidden = !acct.client;
+  b.querySelector(".t").textContent = acct.user ? "Tài khoản" : "Đăng nhập";
+  b.classList.toggle("signed", !!acct.user);
+}
+// --- Character sync: the first sign-in uploads this device's character; later sign-ins load the saved one (the account wins)
+async function pullProfile() {
+  if (!acct.user) return;
+  const { data, error } = await acct.client.from("profiles").select("*").eq("id", acct.user.id).maybeSingle();
+  if (error) { toast("Không tải được nhân vật, bạn thử lại sau nhé"); return; }
+  if (!data) { await pushProfile(); toast("Đã lưu nhân vật của bạn vào tài khoản"); return; }
+  if (applyCloud(data)) toast("Đã tải nhân vật từ tài khoản");
+}
+function applyCloud(d) { // validate everything: the row could have been edited outside the game
+  const a = d.avatar, name = typeof d.display_name === "string" ? d.display_name.trim().slice(0, NAME_MAX) : "";
+  if (!name || !a || typeof a !== "object" || !AV_KEYS.every(k => Number.isInteger(a[k]) && a[k] >= 0 && a[k] < PARTS[k].opts.length)) return false;
+  const pick = (v, arr) => Number.isInteger(v) && v >= 0 && v < arr.length ? v : 0;
+  applyingCloud = true;
+  profile.name = name; player.name = name;
+  profile.color = pick(d.color, NAME_COLORS); profile.status = pick(d.status, STATUSES); profile.pet = pick(d.pet, PETS);
+  player.avatar = Object.fromEntries(AV_KEYS.map(k => [k, a[k]]));
+  saveProfile(profile); saveAvatar(player.avatar); updateAvaIcon();
+  applyingCloud = false; return true;
+}
+async function pushProfile() {
+  if (!acct.user || !acct.client) return;
+  const row = { id: acct.user.id, display_name: profile.name.trim().slice(0, NAME_MAX) || "Bạn", color: profile.color, status: profile.status,
+    pet: profile.pet, avatar: player.avatar, updated_at: new Date().toISOString() };
+  const { error } = await acct.client.from("profiles").upsert(row);
+  if (error) toast("Chưa lưu được nhân vật lên tài khoản");
+}
+function pushProfileSoon() { // called from saveProfile/saveAvatar; waits for the player to stop clicking
+  if (!acct.user || applyingCloud) return;
+  clearTimeout(pushTimer); pushTimer = setTimeout(pushProfile, 1200);
+}
+// --- Sign in / out
+async function sendLink(email) {
+  email = String(email || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { acct.msg = "Email chưa đúng, bạn kiểm tra lại nhé."; return renderAccount(); }
+  acct.busy = true; acct.msg = ""; renderAccount();
+  const { error } = await acct.client.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+  acct.busy = false;
+  if (error) acct.msg = /rate|limit|seconds/i.test(error.message) ? "Gửi quá nhiều email, bạn thử lại sau ít phút." : "Chưa gửi được email, bạn thử lại sau nhé.";
+  else { acct.sentTo = email; acct.msg = ""; }
+  renderAccount();
+}
+const signInGoogle = () => acct.client.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin + location.pathname } });
+async function signOut() { await acct.client.auth.signOut(); acct.sentTo = ""; toast("Đã đăng xuất. Nhân vật vẫn còn trên máy này."); }
+// --- Account panel
+const isAcctOpen = () => modalOpen() && !!document.querySelector(".acct");
+function openAccount() {
+  if (!acct.client) return;
+  view = null; $("mtitle").textContent = "Tài khoản"; $("mhead").style.background = "#455a64";
+  $("grid").style.cssText = "grid-template-columns:1fr"; renderAccount(); showModal();
+  for (const k in keys) keys[k] = false;
+}
+function renderAccount() {
+  const u = acct.user; let body;
+  if (u) body = `<p>Đang đăng nhập: <b>${esc(u.email || "")}</b></p>
+    <p class="cz-hint">Nhân vật của bạn (tên, ngoại hình, thú cưng) được lưu vào tài khoản và dùng được trên mọi thiết bị.</p>
+    <button class="cz-btn2" data-ac="out">Đăng xuất</button>`;
+  else {
+    const warn = IN_APP_BROWSER ? `<p class="acct-warn">Bạn đang mở game trong Zalo/Messenger. Nên mở bằng Safari hoặc Chrome để đăng nhập thuận lợi hơn.</p>` : "";
+    const google = SUPABASE_CFG.google && !IN_APP_BROWSER ? `<button type="button" class="cz-btn2" data-ac="google">Đăng nhập bằng Google</button><p class="cz-hint">hoặc dùng email</p>` : "";
+    const form = acct.sentTo
+      ? `<p>Đã gửi link đăng nhập tới <b>${esc(acct.sentTo)}</b>. Mở email và bấm vào link, game sẽ tự đăng nhập.</p><button type="button" class="cz-btn2" data-ac="again">Dùng email khác</button>`
+      : `<label class="cz-field"><span class="cz-lb">Email</span><span class="cz-input"><span aria-hidden="true">✉️</span>
+         <input id="acctEmail" type="email" autocomplete="email" inputmode="email" placeholder="ban@email.com"${acct.busy ? " disabled" : ""}></span></label>
+         <button class="cz-done" type="submit"${acct.busy ? " disabled" : ""}>${acct.busy ? "Đang gửi…" : "Gửi link đăng nhập"}</button>`;
+    body = `<p class="cz-hint">Bạn đang chơi khách. Đăng nhập để lưu nhân vật và dùng trên mọi thiết bị.</p>${warn}${google}${form}`;
+  }
+  $("grid").innerHTML = `<form id="acctForm" class="cz-panel acct" novalidate>${acct.msg ? `<p class="acct-err" role="alert">${esc(acct.msg)}</p>` : ""}${body}</form>`;
+}
+$("acctBtn").onclick = openAccount;
+$("grid").addEventListener("submit", e => { if (e.target.id === "acctForm") { e.preventDefault(); if (!acct.sentTo && !acct.busy) sendLink($("acctEmail")?.value); } });
+$("grid").addEventListener("click", e => {
+  const b = e.target.closest("[data-ac]"); if (!b) return;
+  if (b.dataset.ac === "out") signOut(); else if (b.dataset.ac === "google") signInGoogle();
+  else if (b.dataset.ac === "again") { acct.sentTo = ""; renderAccount(); }
+});
+addEventListener("load", initAccounts);
 
 // ===== Stalls: each shop has its own roof, wall, sign and display =====
 const OL = "#2b1d16"; // dark pixel-art outline, matching the Tiny Town tiles
